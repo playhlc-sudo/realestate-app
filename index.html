@@ -659,7 +659,7 @@
 
     <div class="checklist-grid">
       <div class="checklist-item">
-        <h4>💼 직장 (일자리)</h4>
+        <h4 style="display:flex;align-items:center;gap:8px;">💼 직장 (일자리)<button onclick="showLocationInfo('jikjang')" style="width:22px;height:22px;border-radius:50%;border:1.5px solid #2c5282;background:white;color:#2c5282;font-size:12px;font-weight:bold;cursor:pointer;line-height:1;padding:0;flex-shrink:0;" title="데이터 출처 보기">i</button></h4>
         <p style="font-size:12px;color:#718096;margin-bottom:10px;">S: 근로자수 30만명 이상 / A: 20만 / B: 10만 / C: 10만 미만</p>
         <div class="grade-buttons" data-category="job">
           <button class="grade-btn" data-grade="S">S</button>
@@ -669,7 +669,7 @@
         </div>
       </div>
       <div class="checklist-item">
-        <h4>🚇 교통</h4>
+        <h4 style="display:flex;align-items:center;gap:8px;">🚇 교통<button onclick="showLocationInfo('gyotong')" style="width:22px;height:22px;border-radius:50%;border:1.5px solid #2c5282;background:white;color:#2c5282;font-size:12px;font-weight:bold;cursor:pointer;line-height:1;padding:0;flex-shrink:0;" title="데이터 출처 보기">i</button></h4>
         <p style="font-size:12px;color:#718096;margin-bottom:10px;">S: 강남 30분 이내 / A: 강남 1시간, 부도심 30분 / B: 부도심 1시간 / C: 그 외</p>
         <div class="grade-buttons" data-category="transport">
           <button class="grade-btn" data-grade="S">S</button>
@@ -679,7 +679,7 @@
         </div>
       </div>
       <div class="checklist-item">
-        <h4>🎓 학군</h4>
+        <h4 style="display:flex;align-items:center;gap:8px;">🎓 학군<button onclick="showLocationInfo('hakgun')" style="width:22px;height:22px;border-radius:50%;border:1.5px solid #2c5282;background:white;color:#2c5282;font-size:12px;font-weight:bold;cursor:pointer;line-height:1;padding:0;flex-shrink:0;" title="데이터 출처 보기">i</button></h4>
         <p style="font-size:12px;color:#718096;margin-bottom:10px;">S: 학업성취도 95% 이상 / A: 90% / B: 85% / C: 85% 미만</p>
         <div class="grade-buttons" data-category="school">
           <button class="grade-btn" data-grade="S">S</button>
@@ -689,7 +689,7 @@
         </div>
       </div>
       <div class="checklist-item">
-        <h4>🛒 환경/상권</h4>
+        <h4 style="display:flex;align-items:center;gap:8px;">🛒 환경/상권<button onclick="showLocationInfo('hwangyeong')" style="width:22px;height:22px;border-radius:50%;border:1.5px solid #2c5282;background:white;color:#2c5282;font-size:12px;font-weight:bold;cursor:pointer;line-height:1;padding:0;flex-shrink:0;" title="데이터 출처 보기">i</button></h4>
         <p style="font-size:12px;color:#718096;margin-bottom:10px;">S: 1km 내 백화점 2개 이상 / A: 백화점 1개 이상 / B: 대형마트 / C: 그 외</p>
         <div class="grade-buttons" data-category="env">
           <button class="grade-btn" data-grade="S">S</button>
@@ -699,7 +699,7 @@
         </div>
       </div>
       <div class="checklist-item">
-        <h4>🏗️ 공급</h4>
+        <h4 style="display:flex;align-items:center;gap:8px;">🏗️ 공급<button onclick="showLocationInfo('gonggeup')" style="width:22px;height:22px;border-radius:50%;border:1.5px solid #2c5282;background:white;color:#2c5282;font-size:12px;font-weight:bold;cursor:pointer;line-height:1;padding:0;flex-shrink:0;" title="데이터 출처 보기">i</button></h4>
         <p style="font-size:12px;color:#718096;margin-bottom:10px;">S: 입주물량 없음 / A: 인구수 대비 0.5% 이하 / B: 0.5%~1% / C: 1% 초과</p>
         <div class="grade-buttons" data-category="supply">
           <button class="grade-btn" data-grade="S">S</button>
@@ -715,6 +715,14 @@
     </div>
 
     <div id="locationResult"></div>
+
+    <!-- 입지평가 데이터 출처 모달 -->
+    <div id="locationInfoModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;padding:20px;">
+      <div style="background:white;border-radius:12px;max-width:520px;width:100%;max-height:80vh;overflow-y:auto;padding:24px;position:relative;">
+        <button onclick="closeLocationInfo()" style="position:absolute;top:12px;right:12px;background:none;border:none;font-size:24px;cursor:pointer;color:#a0aec0;">&times;</button>
+        <div id="locationInfoContent"></div>
+      </div>
+    </div>
   </div>
 
   <!-- 탭 4: 이론 학습 -->
@@ -1852,6 +1860,99 @@ document.querySelectorAll('.grade-buttons').forEach(group => {
       selected[group.dataset.category] = btn.dataset.grade;
     });
   });
+});
+
+// ============ 입지평가 데이터 출처 안내 ============
+const LOCATION_INFO = {
+  jikjang: {
+    title: '\u{1F4BC} 직장(일자리) — 어디서 확인하나요?',
+    rows: [
+      ['평가 기준', 'S 30만명 이상 / A 20만 / B 10만 / C 10만 미만'],
+      ['데이터 종류', '시·군·구별 종사자(근로자) 수'],
+      ['공식 출처', '통계청 KOSIS (kosis.kr)'],
+      ['조회 방법', '국내통계 → 주제별 통계 → 노동 → 사업체노동력조사 → 시군구별 종사자수'],
+      ['난이도', '⭐⭐ 사이트 검색 약간 번거로움'],
+      ['바로가기', '<a href="https://kosis.kr" target="_blank" style="color:#2c5282;">KOSIS 열기</a>']
+    ],
+    note: '\u{1F4A1} 강남구·서초구·송파구·종로구·중구 등은 검색 없이도 30만 수준임을 알 수 있습니다.'
+  },
+  gyotong: {
+    title: '\u{1F687} 교통 — 어디서 확인하나요?',
+    rows: [
+      ['평가 기준', 'S 강남 30분 이내 / A 강남 1시간 또는 부도심 30분 / B 부도심 1시간 / C 그 외'],
+      ['데이터 종류', '지하철·자가용 통근 시간'],
+      ['공식 출처', '카카오맵, 네이버지도'],
+      ['조회 방법', '출발: 평가하려는 지역 / 도착: 강남역(또는 광화문, 여의도) → 길찾기'],
+      ['난이도', '⭐ 매우 쉬움'],
+      ['바로가기', '<a href="https://map.kakao.com" target="_blank" style="color:#2c5282;">카카오맵</a> · <a href="https://map.naver.com" target="_blank" style="color:#2c5282;">네이버지도</a>']
+    ],
+    note: '\u{1F4A1} 출퇴근 시간대(평일 오전 8시)로 검색해야 실제 통근 시간이 나옵니다.'
+  },
+  hakgun: {
+    title: '\u{1F393} 학군 — 어디서 확인하나요?',
+    rows: [
+      ['평가 기준', 'S 학업성취도 95% 이상 / A 90% / B 85% / C 85% 미만'],
+      ['공식 데이터', '<span style="color:#9b2c2c;font-weight:600;">❌ 2017년 이후 일반 비공개</span>'],
+      ['대안 1', '아실(asil.kr) — 학군 비교 기능. 자체 추정치 기반'],
+      ['대안 2', '호갱노노(hogangnono.com) — 동네 학군 평판'],
+      ['대안 3', '학원가 밀집도로 간접 추정 (대치·목동·중계·분당 등)'],
+      ['난이도', '⭐⭐⭐ 객관 데이터 없음, 정성평가 불가피'],
+      ['바로가기', '<a href="https://asil.kr" target="_blank" style="color:#2c5282;">아실</a> · <a href="https://hogangnono.com" target="_blank" style="color:#2c5282;">호갱노노</a>']
+    ],
+    note: '⚠️ 학군은 가장 주관적인 항목입니다. 가족의 자녀 교육 우선순위에 맞춰 평가하세요.'
+  },
+  hwangyeong: {
+    title: '\u{1F6D2} 환경/상권 — 어디서 확인하나요?',
+    rows: [
+      ['평가 기준', 'S 1km 내 백화점 2개 이상 / A 백화점 1개 / B 대형마트 / C 그 외'],
+      ['데이터 종류', '주변 백화점·대형마트 위치'],
+      ['공식 출처', '카카오맵, 네이버지도'],
+      ['조회 방법', '지도에서 평가 지역 중심으로 "백화점" "대형마트" 검색 → 1km 반경 표시'],
+      ['난이도', '⭐ 매우 쉬움'],
+      ['바로가기', '<a href="https://map.kakao.com" target="_blank" style="color:#2c5282;">카카오맵</a>']
+    ],
+    note: '\u{1F4A1} 카카오맵에서 "내 위치"가 아니라 "특정 지점"을 중심으로 검색해야 정확합니다.'
+  },
+  gonggeup: {
+    title: '\u{1F3D7}️ 공급(입주물량) — 어디서 확인하나요?',
+    rows: [
+      ['평가 기준', 'S 입주물량 없음 / A 인구수 대비 0.5% 이하 / B 0.5%~1% / C 1% 초과'],
+      ['데이터 종류', '향후 1~2년 입주 예정 단지 수, 세대수'],
+      ['공식 출처', '아실(asil.kr), 부동산114, KB부동산'],
+      ['조회 방법', '아실 → 입주물량 메뉴 → 해당 지역 선택'],
+      ['난이도', '⭐⭐ 사이트는 무료지만 가입 필요할 수 있음'],
+      ['바로가기', '<a href="https://asil.kr" target="_blank" style="color:#2c5282;">아실 입주물량</a>']
+    ],
+    note: '\u{1F4A1} 입주물량이 많으면 공급 과잉 → 단기 가격 약세 신호. 매수 신중.'
+  }
+};
+
+function showLocationInfo(key) {
+  const info = LOCATION_INFO[key];
+  if (!info) return;
+  const rows = info.rows.map(([k, v]) =>
+    `<tr>
+      <td style="padding:8px;border-bottom:1px solid #edf2f7;color:#4a5568;font-size:13px;width:90px;vertical-align:top;font-weight:600;">${k}</td>
+      <td style="padding:8px;border-bottom:1px solid #edf2f7;color:#2d3748;font-size:13px;line-height:1.6;">${v}</td>
+    </tr>`
+  ).join('');
+  document.getElementById('locationInfoContent').innerHTML = `
+    <h3 style="color:#1a365d;margin-bottom:16px;font-size:18px;">${info.title}</h3>
+    <table style="width:100%;border-collapse:collapse;">${rows}</table>
+    <div style="margin-top:16px;background:#f7fafc;padding:12px;border-radius:8px;font-size:13px;color:#4a5568;">${info.note}</div>
+    <button onclick="closeLocationInfo()" style="margin-top:16px;width:100%;padding:10px;background:#2c5282;color:white;border:none;border-radius:8px;cursor:pointer;font-size:14px;">닫기</button>
+  `;
+  const modal = document.getElementById('locationInfoModal');
+  modal.style.display = 'flex';
+}
+
+function closeLocationInfo() {
+  document.getElementById('locationInfoModal').style.display = 'none';
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const modal = document.getElementById('locationInfoModal');
+  if (modal) modal.addEventListener('click', e => { if (e.target === modal) closeLocationInfo(); });
 });
 
 function evaluateLocation() {
