@@ -571,34 +571,31 @@
       <div class="input-card danji-1">
         <h3>🔴 단지 A</h3>
         <label>지역 선택</label>
-        <select id="pc_region1" onchange="pcInvalidatePreview(1)"><option value="">— 지역 선택 —</option></select>
-        <label>단지명 키워드</label>
-        <input type="text" id="pc_keyword1" placeholder="예: 선사현대" oninput="pcInvalidatePreview(1)">
+        <select id="pc_region1" onchange="pcOnRegionChange(1)"><option value="">— 지역 선택 —</option></select>
+        <label>단지명 키워드 (2글자 이상 입력 시 자동완성)</label>
+        <input type="text" id="pc_keyword1" placeholder="예: 선사현대" oninput="pcOnKeywordInput(1)">
         <label>평형 (선택, 예: 33)</label>
         <input type="number" id="pc_area1" placeholder="미입력 시 전체 평형" step="1" min="10" max="100">
-        <button class="btn-secondary" style="margin-top:8px;width:100%;" onclick="pcPreviewApts(1)">🔍 단지명 미리보기</button>
         <div id="pc_match_list1" style="display:none;margin-top:8px;"></div>
       </div>
       <div class="input-card danji-2">
         <h3>🔵 단지 B</h3>
         <label>지역 선택</label>
-        <select id="pc_region2" onchange="pcInvalidatePreview(2)"><option value="">— 지역 선택 —</option></select>
-        <label>단지명 키워드</label>
-        <input type="text" id="pc_keyword2" placeholder="예: 신도림대림" oninput="pcInvalidatePreview(2)">
+        <select id="pc_region2" onchange="pcOnRegionChange(2)"><option value="">— 지역 선택 —</option></select>
+        <label>단지명 키워드 (2글자 이상 입력 시 자동완성)</label>
+        <input type="text" id="pc_keyword2" placeholder="예: 신도림대림" oninput="pcOnKeywordInput(2)">
         <label>평형 (선택, 예: 33)</label>
         <input type="number" id="pc_area2" placeholder="미입력 시 전체 평형" step="1" min="10" max="100">
-        <button class="btn-secondary" style="margin-top:8px;width:100%;" onclick="pcPreviewApts(2)">🔍 단지명 미리보기</button>
         <div id="pc_match_list2" style="display:none;margin-top:8px;"></div>
       </div>
       <div class="input-card danji-3">
         <h3>🟢 단지 C</h3>
         <label>지역 선택</label>
-        <select id="pc_region3" onchange="pcInvalidatePreview(3)"><option value="">— 지역 선택 —</option></select>
-        <label>단지명 키워드</label>
-        <input type="text" id="pc_keyword3" placeholder="예: 답십리두산" oninput="pcInvalidatePreview(3)">
+        <select id="pc_region3" onchange="pcOnRegionChange(3)"><option value="">— 지역 선택 —</option></select>
+        <label>단지명 키워드 (2글자 이상 입력 시 자동완성)</label>
+        <input type="text" id="pc_keyword3" placeholder="예: 답십리두산" oninput="pcOnKeywordInput(3)">
         <label>평형 (선택, 예: 33)</label>
         <input type="number" id="pc_area3" placeholder="미입력 시 전체 평형" step="1" min="10" max="100">
-        <button class="btn-secondary" style="margin-top:8px;width:100%;" onclick="pcPreviewApts(3)">🔍 단지명 미리보기</button>
         <div id="pc_match_list3" style="display:none;margin-top:8px;"></div>
       </div>
     </div>
@@ -1101,7 +1098,7 @@ const PC_DB_VER = 1;
 const PC_STORE = 'monthlyDeals';
 let pcDB = null;
 let pcAborted = false;
-const pcPreviewCache = {};
+const pcAptPool = {};  // { regionCode: [{aptNm, count}] }
 
 async function initPcDB() {
   return new Promise((resolve, reject) => {
@@ -1533,8 +1530,8 @@ async function pcStartAnalysis() {
   if (active.length < 2) { alert('최소 2개 단지의 지역과 단지명 키워드를 입력해주세요.'); return; }
   for (const u of active) {
     const idx = units.indexOf(u) + 1;
-    if (pcPreviewCache[idx] && u.selectedNames.length === 0) {
-      alert(`단지 ${idx}: 미리보기에서 단지를 1개 이상 선택해주세요.`); return;
+    if (pcAptPool[u.code] && u.selectedNames.length === 0) {
+      alert(`단지 ${idx}: 키워드 입력 후 자동완성에서 단지명을 1개 이상 선택해주세요.`); return;
     }
   }
 
@@ -1603,67 +1600,99 @@ async function pcStartAnalysis() {
 
 function pcAbort() { pcAborted = true; }
 
-function pcInvalidatePreview(idx) {
-  delete pcPreviewCache[idx];
+function pcOnRegionChange(idx) {
   const el = document.getElementById(`pc_match_list${idx}`);
   if (el) { el.innerHTML = ''; el.style.display = 'none'; }
+  const kw = document.getElementById(`pc_keyword${idx}`);
+  if (kw) kw.style.borderColor = '';
+}
+
+async function pcOnKeywordInput(idx) {
+  const keyword = document.getElementById(`pc_keyword${idx}`).value.trim();
+  const code = document.getElementById(`pc_region${idx}`).value;
+  const el = document.getElementById(`pc_match_list${idx}`);
+
+  if (keyword.length < 2 || !code) {
+    el.innerHTML = ''; el.style.display = 'none';
+    document.getElementById(`pc_keyword${idx}`).style.borderColor = '';
+    return;
+  }
+
+  if (!pcAptPool[code]) {
+    el.style.display = 'block';
+    el.innerHTML = '<p style="font-size:12px;color:#718096;">⏳ 지역 단지 목록 로딩 중 (최초 1회)...</p>';
+    await pcBuildAptPool(code);
+  }
+
+  pcRenderAutocomplete(idx, keyword);
+}
+
+async function pcBuildAptPool(code) {
+  const apiKey = (document.getElementById('apiKey').value || localStorage.getItem('apiKey') || '').trim();
+  if (!apiKey) return;
+
+  const now = new Date();
+  const nameCount = {};
+  for (let i = 0; i < 12; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const ym = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}`;
+    try {
+      const deals = await pcFetchMonth(apiKey, code, ym);
+      deals.forEach(d => { if (d.aptNm) nameCount[d.aptNm] = (nameCount[d.aptNm] || 0) + 1; });
+      await pcDelay(200);
+    } catch (e) { /* 월 단위 실패 무시 */ }
+  }
+  pcAptPool[code] = Object.entries(nameCount)
+    .map(([aptNm, count]) => ({ aptNm, count }))
+    .sort((a, b) => b.count - a.count);
+}
+
+function pcRenderAutocomplete(idx, keyword) {
+  const code = document.getElementById(`pc_region${idx}`).value;
+  const el = document.getElementById(`pc_match_list${idx}`);
+  const pool = pcAptPool[code] || [];
+  const matches = pool.filter(p => p.aptNm.includes(keyword)).slice(0, 30);
+
+  if (!matches.length) {
+    el.style.display = 'block';
+    el.innerHTML = '<p style="font-size:12px;color:#e53e3e;">해당 키워드 단지 없음. 키워드를 바꿔보세요.</p>';
+    document.getElementById(`pc_keyword${idx}`).style.borderColor = '#e53e3e';
+    return;
+  }
+
+  const rows = matches.map((p, i) => `
+    <label style="display:flex;align-items:center;gap:6px;font-size:12px;padding:4px 0;cursor:pointer;border-bottom:1px solid #edf2f7;">
+      <input type="checkbox" value="${p.aptNm.replace(/"/g, '&quot;')}" ${i === 0 ? 'checked' : ''} onchange="pcOnCheckChange(${idx})" style="cursor:pointer;flex-shrink:0;">
+      <span>${p.aptNm} <span style="color:#718096;">(${p.count}건)</span></span>
+    </label>`).join('');
+
+  el.style.display = 'block';
+  el.innerHTML = `<div style="border:1px solid #e2e8f0;border-radius:6px;padding:8px;background:#f8fafc;">
+    <p style="font-size:11px;color:#4a5568;margin-bottom:4px;">💡 같은 지역 단지 ${matches.length}개 발견 — 포함할 단지 선택</p>
+    ${rows}
+    <div style="display:flex;gap:8px;margin-top:6px;">
+      <button onclick="pcSelectAll(${idx},true)" style="font-size:11px;padding:2px 8px;border:1px solid #cbd5e0;border-radius:4px;background:#fff;cursor:pointer;">전체선택</button>
+      <button onclick="pcSelectAll(${idx},false)" style="font-size:11px;padding:2px 8px;border:1px solid #cbd5e0;border-radius:4px;background:#fff;cursor:pointer;">전체해제</button>
+    </div>
+  </div>`;
+  document.getElementById(`pc_keyword${idx}`).style.borderColor = '';
+}
+
+function pcOnCheckChange(idx) {
+  const names = pcGetSelectedNames(idx);
+  document.getElementById(`pc_keyword${idx}`).style.borderColor = names.length === 0 ? '#e53e3e' : '';
+}
+
+function pcSelectAll(idx, checked) {
+  const el = document.getElementById(`pc_match_list${idx}`);
+  if (el) el.querySelectorAll('input[type=checkbox]').forEach(cb => cb.checked = checked);
+  pcOnCheckChange(idx);
 }
 
 function pcGetSelectedNames(idx) {
   const el = document.getElementById(`pc_match_list${idx}`);
   if (!el) return [];
   return [...el.querySelectorAll('input[type=checkbox]:checked')].map(cb => cb.value);
-}
-
-async function pcPreviewApts(idx) {
-  const apiKey = (document.getElementById('apiKey').value || localStorage.getItem('apiKey') || '').trim();
-  if (!apiKey) { alert('"API 설정" 탭에서 API 키를 먼저 등록해주세요.'); return; }
-  const code = document.getElementById(`pc_region${idx}`).value;
-  const keyword = document.getElementById(`pc_keyword${idx}`).value.trim();
-  if (!code) { alert('지역을 선택해주세요.'); return; }
-  if (!keyword) { alert('단지명 키워드를 입력해주세요.'); return; }
-
-  const el = document.getElementById(`pc_match_list${idx}`);
-  el.style.display = 'block';
-  el.innerHTML = '<p style="font-size:12px;color:#718096;">최근 12개월 데이터 조회 중...</p>';
-
-  const now = new Date();
-  const months = [];
-  for (let i = 0; i < 12; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    months.push(`${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}`);
-  }
-
-  const nameCount = {};
-  for (const ym of months) {
-    try {
-      const deals = await pcFetchMonth(apiKey, code, ym);
-      deals.filter(d => d.aptNm && d.aptNm.includes(keyword)).forEach(d => {
-        nameCount[d.aptNm] = (nameCount[d.aptNm] || 0) + 1;
-      });
-      await pcDelay(200);
-    } catch (e) { /* 월 단위 실패는 무시 */ }
-  }
-
-  pcPreviewCache[idx] = Object.keys(nameCount);
-
-  if (!pcPreviewCache[idx].length) {
-    el.innerHTML = '<p style="font-size:12px;color:#e53e3e;">최근 12개월 내 해당 키워드 거래 없음. 키워드를 확인해주세요.</p>';
-    return;
-  }
-
-  const rows = Object.entries(nameCount)
-    .sort((a, b) => b[1] - a[1])
-    .map(([name, cnt]) => `
-      <label style="display:flex;align-items:center;gap:6px;font-size:12px;padding:3px 0;cursor:pointer;">
-        <input type="checkbox" value="${name.replace(/"/g, '&quot;')}" checked style="cursor:pointer;">
-        <span>${name} <span style="color:#718096;">(${cnt}건)</span></span>
-      </label>`).join('');
-
-  el.innerHTML = `<div style="border:1px solid #e2e8f0;border-radius:6px;padding:8px;background:#f8fafc;">
-    <p style="font-size:11px;color:#4a5568;margin-bottom:4px;">✅ 포함할 단지 선택 (체크 해제 시 제외)</p>
-    ${rows}
-  </div>`;
 }
 
 // — 예시 불러오기 —
