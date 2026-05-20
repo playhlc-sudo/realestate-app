@@ -481,7 +481,36 @@
     <!-- 관심 지역 관리 -->
     <div style="background:#f7fafc;padding:20px;border-radius:10px;margin-bottom:20px;border:1px solid #e2e8f0;">
       <h3 style="color:#1a365d;margin-bottom:12px;font-size:16px;">📍 관심 지역 관리</h3>
-      <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end;">
+
+      <!-- 지역 선택기 (드롭다운 + 검색) -->
+      <div style="background:white;border-radius:8px;padding:14px;border:1px solid #cbd5e0;">
+        <div style="font-size:13px;color:#4a5568;margin-bottom:10px;">🔎 <strong>지역 선택</strong> — 검색하거나 드롭다운으로 고르면 코드가 자동 입력됩니다</div>
+
+        <!-- 검색창 -->
+        <div style="position:relative;margin-bottom:10px;">
+          <input type="text" id="regionSearchBox" placeholder="🔍 지역 검색 (예: 강남, 분당, 수성구...)" autocomplete="off" style="padding-left:12px;">
+          <div id="regionSearchResults" style="display:none;position:absolute;top:100%;left:0;right:0;max-height:260px;overflow-y:auto;background:white;border:1px solid #cbd5e0;border-radius:8px;box-shadow:0 6px 16px rgba(0,0,0,0.08);z-index:50;margin-top:4px;"></div>
+        </div>
+
+        <!-- 시·도 + 시·군·구 드롭다운 -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div>
+            <label style="font-size:12px;">시·도</label>
+            <select id="sidoSelect" onchange="onSidoChange()" style="width:100%;padding:10px;border:2px solid #e2e8f0;border-radius:8px;font-size:14px;background:white;">
+              <option value="">시·도 선택</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:12px;">시·군·구</label>
+            <select id="sigunguSelect" onchange="onSigunguChange()" style="width:100%;padding:10px;border:2px solid #e2e8f0;border-radius:8px;font-size:14px;background:white;">
+              <option value="">시·도를 먼저 선택</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- 지역명/코드 입력 + 추가 -->
+      <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end;margin-top:14px;">
         <div>
           <label>지역명 (별칭)</label>
           <input type="text" id="newRegionName" placeholder="예: 강남구">
@@ -492,8 +521,8 @@
         </div>
         <button class="btn-primary" onclick="addRegion()" style="padding:10px 20px;">➕ 추가</button>
       </div>
-      <div style="margin-top:12px;font-size:12px;color:#718096;">
-        💡 지역코드를 모르시면 "API 설정" 탭 하단의 지역코드 표를 참고하세요.
+      <div style="margin-top:8px;font-size:12px;color:#718096;">
+        💡 위에서 지역을 선택하면 자동으로 채워집니다. 코드를 알고 있다면 직접 입력해도 됩니다.
       </div>
       <div id="regionList" style="margin-top:16px;display:flex;flex-wrap:wrap;gap:8px;"></div>
     </div>
@@ -714,9 +743,13 @@
 
     <div class="api-step">
       <span class="step-num">2</span>
-      <strong>"국토교통부 아파트매매 실거래가 자료" 검색</strong>
+      <strong>⚠️ "국토교통부_아파트 매매 실거래가 <span style="background:#fef5e7;padding:0 6px;border-radius:3px;">상세</span> 자료" 신청 (반드시 '상세' 버전!)</strong>
       <p style="margin-top:8px;color:#4a5568;font-size:14px;">
-        검색창에 위 키워드 입력 → 오픈 API 신청 (활용 목적: 개인 학습 등 자유롭게 작성)
+        검색 결과에 비슷한 3개가 나오지만, 우리 앱은 <strong>"상세 자료"</strong> 버전 전용입니다.<br>
+        구버전이나 분양권전매 버전을 잘못 신청하면 앱에서 데이터를 못 가져옵니다.
+      </p>
+      <p style="margin-top:8px;color:#4a5568;font-size:14px;">
+        → ② 번 항목 우측 <strong>활용신청</strong> 클릭 → 목적: 개인 학습 등 자유 작성 → 신청
       </p>
     </div>
 
@@ -763,20 +796,11 @@
       이 앱에서는 API 키 발급 안내 및 연동 준비를 위한 가이드로 활용해주세요.
     </div>
 
-    <h3 style="margin-top:30px;color:#1a365d;">📍 주요 지역코드 (LAWD_CD) 참고</h3>
-    <div style="background:#f7fafc;padding:16px;border-radius:8px;margin-top:12px;font-size:13px;">
-      <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px,1fr));gap:8px;">
-        <div>🔹 강남구: <strong>11680</strong></div>
-        <div>🔹 서초구: <strong>11650</strong></div>
-        <div>🔹 송파구: <strong>11710</strong></div>
-        <div>🔹 강동구: <strong>11740</strong></div>
-        <div>🔹 마포구: <strong>11440</strong></div>
-        <div>🔹 성동구: <strong>11200</strong></div>
-        <div>🔹 분당구(성남): <strong>41135</strong></div>
-        <div>🔹 수지구(용인): <strong>41465</strong></div>
-        <div>🔹 화성시: <strong>41590</strong></div>
-        <div>🔹 일산동구(고양): <strong>41285</strong></div>
-      </div>
+    <div class="insight-box" style="margin-top:24px;">
+      <strong>📍 지역 추가 방법:</strong><br>
+      지역 추가는 <strong>"📈 사이클 진단"</strong> 탭의 <strong>"관심 지역 관리"</strong> 영역에서 합니다.<br>
+      검색창에 지역명을 입력하거나, 시·도·시·군·구 드롭다운으로 선택하면 전국 250개 시·군·구 코드를 자동으로 불러올 수 있습니다.<br>
+      <button class="btn-primary" onclick="document.querySelector('[data-tab=&quot;cycle&quot;]').click()" style="margin-top:12px;">📈 사이클 진단 탭으로 이동</button>
     </div>
   </div>
 
@@ -802,10 +826,21 @@
 
     <div class="api-step">
       <span class="step-num">2</span>
-      <strong>API 검색</strong>
+      <strong>API 검색 — ⚠️ 정확히 "상세 자료" 버전을 골라야 함</strong>
       <p style="margin-top:8px;color:#4a5568;font-size:14px;">
-        상단 검색창에 <strong>"아파트 매매 실거래가 상세자료"</strong> 입력<br>
-        → 결과 중 "국토교통부_아파트 매매 실거래가 상세자료" 클릭
+        상단 검색창에 <strong>"아파트 매매 실거래가"</strong> 입력 → 비슷한 결과 3개가 보입니다:
+      </p>
+      <div style="margin-top:10px;background:#f7fafc;border-radius:8px;padding:12px;font-size:13px;">
+        <div style="color:#718096;text-decoration:line-through;">① 국토교통부_아파트 매매 실거래가 자료 (구버전 — ❌)</div>
+        <div style="color:#2f855a;font-weight:700;margin-top:6px;">② 국토교통부_아파트 매매 실거래가 <span style="background:#fef5e7;padding:0 6px;border-radius:3px;">상세</span> 자료 (✅ 이걸 선택!)</div>
+        <div style="color:#718096;text-decoration:line-through;margin-top:6px;">③ 국토교통부_아파트 분양권전매 실거래가 자료 (다른 용도 — ❌)</div>
+      </div>
+      <p style="margin-top:10px;color:#9b2c2c;font-size:13px;">
+        ※ 우리 앱은 <strong>"상세 자료"</strong>에만 들어있는 데이터(층/전용면적 등)를 사용합니다.<br>
+        다른 버전 키를 발급받으면 앱에서 "데이터 없음" 또는 "인증키 오류"가 발생합니다.
+      </p>
+      <p style="margin-top:8px;color:#4a5568;font-size:14px;">
+        ② 클릭 → 우측 <strong>활용신청</strong> 버튼
       </p>
     </div>
 
@@ -934,6 +969,112 @@
 </div>
 
 <script>
+// ============ 지역 데이터 (전국 시·군·구 LAWD_CD) ============
+const REGIONS_DATA = {"서울특별시":[{"name":"종로구","code":"11110"},{"name":"중구","code":"11140"},{"name":"용산구","code":"11170"},{"name":"성동구","code":"11200"},{"name":"광진구","code":"11215"},{"name":"동대문구","code":"11230"},{"name":"중랑구","code":"11260"},{"name":"성북구","code":"11290"},{"name":"강북구","code":"11305"},{"name":"도봉구","code":"11320"},{"name":"노원구","code":"11350"},{"name":"은평구","code":"11380"},{"name":"서대문구","code":"11410"},{"name":"마포구","code":"11440"},{"name":"양천구","code":"11470"},{"name":"강서구","code":"11500"},{"name":"구로구","code":"11530"},{"name":"금천구","code":"11545"},{"name":"영등포구","code":"11560"},{"name":"동작구","code":"11590"},{"name":"관악구","code":"11620"},{"name":"서초구","code":"11650"},{"name":"강남구","code":"11680"},{"name":"송파구","code":"11710"},{"name":"강동구","code":"11740"}],"부산광역시":[{"name":"중구","code":"26110"},{"name":"서구","code":"26140"},{"name":"동구","code":"26170"},{"name":"영도구","code":"26200"},{"name":"부산진구","code":"26230"},{"name":"동래구","code":"26260"},{"name":"남구","code":"26290"},{"name":"북구","code":"26320"},{"name":"해운대구","code":"26350"},{"name":"사하구","code":"26380"},{"name":"금정구","code":"26410"},{"name":"강서구","code":"26440"},{"name":"연제구","code":"26470"},{"name":"수영구","code":"26500"},{"name":"사상구","code":"26530"},{"name":"기장군","code":"26710"}],"대구광역시":[{"name":"중구","code":"27110"},{"name":"동구","code":"27140"},{"name":"서구","code":"27170"},{"name":"남구","code":"27200"},{"name":"북구","code":"27230"},{"name":"수성구","code":"27260"},{"name":"달서구","code":"27290"},{"name":"달성군","code":"27710"},{"name":"군위군","code":"27720"}],"인천광역시":[{"name":"중구","code":"28110"},{"name":"동구","code":"28140"},{"name":"미추홀구","code":"28177"},{"name":"연수구","code":"28185"},{"name":"남동구","code":"28200"},{"name":"부평구","code":"28237"},{"name":"계양구","code":"28245"},{"name":"서구","code":"28260"},{"name":"강화군","code":"28710"},{"name":"옹진군","code":"28720"}],"광주광역시":[{"name":"동구","code":"29110"},{"name":"서구","code":"29140"},{"name":"남구","code":"29155"},{"name":"북구","code":"29170"},{"name":"광산구","code":"29200"}],"대전광역시":[{"name":"동구","code":"30110"},{"name":"중구","code":"30140"},{"name":"서구","code":"30170"},{"name":"유성구","code":"30200"},{"name":"대덕구","code":"30230"}],"울산광역시":[{"name":"중구","code":"31110"},{"name":"남구","code":"31140"},{"name":"동구","code":"31170"},{"name":"북구","code":"31200"},{"name":"울주군","code":"31710"}],"세종특별자치시":[{"name":"세종시","code":"36110"}],"경기도":[{"name":"수원시 장안구","code":"41111"},{"name":"수원시 권선구","code":"41113"},{"name":"수원시 팔달구","code":"41115"},{"name":"수원시 영통구","code":"41117"},{"name":"성남시 수정구","code":"41131"},{"name":"성남시 중원구","code":"41133"},{"name":"성남시 분당구","code":"41135"},{"name":"의정부시","code":"41150"},{"name":"안양시 만안구","code":"41171"},{"name":"안양시 동안구","code":"41173"},{"name":"부천시","code":"41190"},{"name":"광명시","code":"41210"},{"name":"평택시","code":"41220"},{"name":"동두천시","code":"41250"},{"name":"안산시 상록구","code":"41271"},{"name":"안산시 단원구","code":"41273"},{"name":"고양시 덕양구","code":"41281"},{"name":"고양시 일산동구","code":"41285"},{"name":"고양시 일산서구","code":"41287"},{"name":"과천시","code":"41290"},{"name":"구리시","code":"41310"},{"name":"남양주시","code":"41360"},{"name":"오산시","code":"41370"},{"name":"시흥시","code":"41390"},{"name":"군포시","code":"41410"},{"name":"의왕시","code":"41430"},{"name":"하남시","code":"41450"},{"name":"용인시 처인구","code":"41461"},{"name":"용인시 기흥구","code":"41463"},{"name":"용인시 수지구","code":"41465"},{"name":"파주시","code":"41480"},{"name":"이천시","code":"41500"},{"name":"안성시","code":"41550"},{"name":"김포시","code":"41570"},{"name":"화성시","code":"41590"},{"name":"광주시","code":"41610"},{"name":"양주시","code":"41630"},{"name":"포천시","code":"41650"},{"name":"여주시","code":"41670"},{"name":"연천군","code":"41800"},{"name":"가평군","code":"41820"},{"name":"양평군","code":"41830"}],"강원특별자치도":[{"name":"춘천시","code":"51110"},{"name":"원주시","code":"51130"},{"name":"강릉시","code":"51150"},{"name":"동해시","code":"51170"},{"name":"태백시","code":"51190"},{"name":"속초시","code":"51210"},{"name":"삼척시","code":"51230"},{"name":"홍천군","code":"51720"},{"name":"횡성군","code":"51730"},{"name":"영월군","code":"51750"},{"name":"평창군","code":"51760"},{"name":"정선군","code":"51770"},{"name":"철원군","code":"51780"},{"name":"화천군","code":"51790"},{"name":"양구군","code":"51800"},{"name":"인제군","code":"51810"},{"name":"고성군","code":"51820"},{"name":"양양군","code":"51830"}],"충청북도":[{"name":"청주시 상당구","code":"43111"},{"name":"청주시 서원구","code":"43112"},{"name":"청주시 흥덕구","code":"43113"},{"name":"청주시 청원구","code":"43114"},{"name":"충주시","code":"43130"},{"name":"제천시","code":"43150"},{"name":"보은군","code":"43720"},{"name":"옥천군","code":"43730"},{"name":"영동군","code":"43740"},{"name":"증평군","code":"43745"},{"name":"진천군","code":"43750"},{"name":"괴산군","code":"43760"},{"name":"음성군","code":"43770"},{"name":"단양군","code":"43800"}],"충청남도":[{"name":"천안시 동남구","code":"44131"},{"name":"천안시 서북구","code":"44133"},{"name":"공주시","code":"44150"},{"name":"보령시","code":"44180"},{"name":"아산시","code":"44200"},{"name":"서산시","code":"44210"},{"name":"논산시","code":"44230"},{"name":"계룡시","code":"44250"},{"name":"당진시","code":"44270"},{"name":"금산군","code":"44710"},{"name":"부여군","code":"44760"},{"name":"서천군","code":"44770"},{"name":"청양군","code":"44790"},{"name":"홍성군","code":"44800"},{"name":"예산군","code":"44810"},{"name":"태안군","code":"44825"}],"전북특별자치도":[{"name":"전주시 완산구","code":"52111"},{"name":"전주시 덕진구","code":"52113"},{"name":"군산시","code":"52130"},{"name":"익산시","code":"52140"},{"name":"정읍시","code":"52180"},{"name":"남원시","code":"52190"},{"name":"김제시","code":"52210"},{"name":"완주군","code":"52710"},{"name":"진안군","code":"52720"},{"name":"무주군","code":"52730"},{"name":"장수군","code":"52740"},{"name":"임실군","code":"52750"},{"name":"순창군","code":"52770"},{"name":"고창군","code":"52790"},{"name":"부안군","code":"52800"}],"전라남도":[{"name":"목포시","code":"46110"},{"name":"여수시","code":"46130"},{"name":"순천시","code":"46150"},{"name":"나주시","code":"46170"},{"name":"광양시","code":"46230"},{"name":"담양군","code":"46710"},{"name":"곡성군","code":"46720"},{"name":"구례군","code":"46730"},{"name":"고흥군","code":"46770"},{"name":"보성군","code":"46780"},{"name":"화순군","code":"46790"},{"name":"장흥군","code":"46800"},{"name":"강진군","code":"46810"},{"name":"해남군","code":"46820"},{"name":"영암군","code":"46830"},{"name":"무안군","code":"46840"},{"name":"함평군","code":"46860"},{"name":"영광군","code":"46870"},{"name":"장성군","code":"46880"},{"name":"완도군","code":"46890"},{"name":"진도군","code":"46900"},{"name":"신안군","code":"46910"}],"경상북도":[{"name":"포항시 남구","code":"47111"},{"name":"포항시 북구","code":"47113"},{"name":"경주시","code":"47130"},{"name":"김천시","code":"47150"},{"name":"안동시","code":"47170"},{"name":"구미시","code":"47190"},{"name":"영주시","code":"47210"},{"name":"영천시","code":"47230"},{"name":"상주시","code":"47250"},{"name":"문경시","code":"47280"},{"name":"경산시","code":"47290"},{"name":"의성군","code":"47730"},{"name":"청송군","code":"47750"},{"name":"영양군","code":"47760"},{"name":"영덕군","code":"47770"},{"name":"청도군","code":"47820"},{"name":"고령군","code":"47830"},{"name":"성주군","code":"47840"},{"name":"칠곡군","code":"47850"},{"name":"예천군","code":"47900"},{"name":"봉화군","code":"47920"},{"name":"울진군","code":"47930"},{"name":"울릉군","code":"47940"}],"경상남도":[{"name":"창원시 의창구","code":"48121"},{"name":"창원시 성산구","code":"48123"},{"name":"창원시 마산합포구","code":"48125"},{"name":"창원시 마산회원구","code":"48127"},{"name":"창원시 진해구","code":"48129"},{"name":"진주시","code":"48170"},{"name":"통영시","code":"48220"},{"name":"사천시","code":"48240"},{"name":"김해시","code":"48250"},{"name":"밀양시","code":"48270"},{"name":"거제시","code":"48310"},{"name":"양산시","code":"48330"},{"name":"의령군","code":"48720"},{"name":"함안군","code":"48730"},{"name":"창녕군","code":"48740"},{"name":"고성군","code":"48820"},{"name":"남해군","code":"48840"},{"name":"하동군","code":"48850"},{"name":"산청군","code":"48860"},{"name":"함양군","code":"48870"},{"name":"거창군","code":"48880"},{"name":"합천군","code":"48890"}],"제주특별자치도":[{"name":"제주시","code":"50110"},{"name":"서귀포시","code":"50130"}]};
+
+// 시·도 드롭다운 초기화
+function initRegionSelector() {
+  const sidoSel = document.getElementById('sidoSelect');
+  if (!sidoSel) return;
+  Object.keys(REGIONS_DATA).forEach(sido => {
+    const opt = document.createElement('option');
+    opt.value = sido;
+    opt.textContent = sido;
+    sidoSel.appendChild(opt);
+  });
+}
+
+// 시·도 변경 시 시·군·구 옵션 갱신
+function onSidoChange() {
+  const sido = document.getElementById('sidoSelect').value;
+  const sigunguSel = document.getElementById('sigunguSelect');
+  sigunguSel.innerHTML = '<option value="">시·군·구 선택</option>';
+  if (!sido) return;
+  REGIONS_DATA[sido].forEach(item => {
+    const opt = document.createElement('option');
+    opt.value = item.code;
+    opt.dataset.name = item.name;
+    opt.textContent = `${item.name} (${item.code})`;
+    sigunguSel.appendChild(opt);
+  });
+}
+
+// 시·군·구 선택 시 입력창 자동 채움
+function onSigunguChange() {
+  const sigunguSel = document.getElementById('sigunguSelect');
+  const selectedOpt = sigunguSel.options[sigunguSel.selectedIndex];
+  if (!selectedOpt || !selectedOpt.value) return;
+  const sido = document.getElementById('sidoSelect').value;
+  const name = selectedOpt.dataset.name;
+  const code = selectedOpt.value;
+  // 지역명은 시도 짧은 이름 + 시군구 (예: 서울 강남구)
+  const sidoShort = sido.replace('특별시','').replace('광역시','').replace('특별자치도','').replace('특별자치시','').replace('도','');
+  document.getElementById('newRegionName').value = sidoShort ? `${sidoShort} ${name}` : name;
+  document.getElementById('newRegionCode').value = code;
+}
+
+// 통합 검색
+function setupRegionSearch() {
+  const box = document.getElementById('regionSearchBox');
+  const results = document.getElementById('regionSearchResults');
+  if (!box || !results) return;
+
+  // 전체 항목 평탄화 (시도+시군구+코드)
+  const flat = [];
+  Object.keys(REGIONS_DATA).forEach(sido => {
+    REGIONS_DATA[sido].forEach(item => {
+      flat.push({
+        sido,
+        name: item.name,
+        code: item.code,
+        searchKey: (sido + ' ' + item.name + ' ' + item.code).toLowerCase()
+      });
+    });
+  });
+
+  box.addEventListener('input', () => {
+    const q = box.value.trim().toLowerCase();
+    if (q.length < 1) {
+      results.style.display = 'none';
+      return;
+    }
+    const matches = flat.filter(it => it.searchKey.includes(q)).slice(0, 20);
+    if (matches.length === 0) {
+      results.innerHTML = '<div style="padding:12px;color:#718096;text-align:center;">검색 결과 없음</div>';
+    } else {
+      results.innerHTML = matches.map(it => {
+        const sidoShort = it.sido.replace('특별시','').replace('광역시','').replace('특별자치도','').replace('특별자치시','').replace('도','');
+        return `<div class="region-search-item" data-sido="${it.sido}" data-name="${it.name}" data-code="${it.code}" data-display="${sidoShort} ${it.name}" style="padding:10px 14px;cursor:pointer;border-bottom:1px solid #f1f5f9;font-size:14px;">
+          <strong>${sidoShort} ${it.name}</strong> <span style="color:#718096;font-size:12px;">${it.code}</span>
+        </div>`;
+      }).join('');
+      // 클릭 이벤트
+      results.querySelectorAll('.region-search-item').forEach(el => {
+        el.addEventListener('mouseenter', () => el.style.background = '#edf2f7');
+        el.addEventListener('mouseleave', () => el.style.background = 'white');
+        el.addEventListener('click', () => {
+          document.getElementById('newRegionName').value = el.dataset.display;
+          document.getElementById('newRegionCode').value = el.dataset.code;
+          // 드롭다운도 동기화
+          document.getElementById('sidoSelect').value = el.dataset.sido;
+          onSidoChange();
+          document.getElementById('sigunguSelect').value = el.dataset.code;
+          box.value = '';
+          results.style.display = 'none';
+        });
+      });
+    }
+    results.style.display = 'block';
+  });
+
+  // 외부 클릭 시 결과창 닫기
+  document.addEventListener('click', (e) => {
+    if (!box.contains(e.target) && !results.contains(e.target)) {
+      results.style.display = 'none';
+    }
+  });
+}
+
 // ============ 탭 전환 ============
 document.querySelectorAll('.tab-btn').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -2133,6 +2274,8 @@ window.addEventListener('load', () => {
   }
   renderRegionList();
   pcPopulateRegions();
+  initRegionSelector();
+  setupRegionSearch();
   document.getElementById('cycleResult').innerHTML = `
     <div class="insight-box">
       <strong>👋 시작하기:</strong><br>
@@ -2150,8 +2293,7 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw.js')
       .then(reg => console.log('[PWA] Service Worker 등록 성공:', reg.scope))
-      .catch(err => console.warn('[PWA] Service Worker 등록 실패:', err));
-  });
+      .catch(err => console.warn('[PWA] Service Worker 등록 실패:', err));  });
 }
 </script>
 </body>
