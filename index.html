@@ -1,0 +1,2158 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>부린이 원리이해 - 부동산 의사결정 앱</title>
+
+<!-- PWA: 홈 화면 앱 설치 지원 -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#2563eb">
+<meta name="description" content="국토교통부 실거래가 API 기반 부동산 분석 앱">
+
+<!-- iOS Safari (아이폰/아이패드) 홈 화면 추가 지원 -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="부동산앱">
+<link rel="apple-touch-icon" href="icon-192.png">
+
+<!-- 파비콘 -->
+<link rel="icon" type="image/png" href="favicon-64.png">
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Malgun Gothic', '맑은 고딕', -apple-system, sans-serif;
+    background: linear-gradient(135deg, #1e3a5f 0%, #2c5282 100%);
+    min-height: 100vh;
+    color: #2d3748;
+    padding: 20px;
+  }
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    background: #ffffff;
+    border-radius: 16px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    overflow: hidden;
+  }
+  header {
+    background: linear-gradient(135deg, #1a365d 0%, #2c5282 100%);
+    color: white;
+    padding: 30px 40px;
+    text-align: center;
+    position: relative;
+  }
+  header::after {
+    content: '🏢';
+    position: absolute;
+    right: 30px;
+    top: 30px;
+    font-size: 40px;
+    opacity: 0.3;
+  }
+  header h1 {
+    font-size: 28px;
+    font-weight: 800;
+    margin-bottom: 8px;
+    letter-spacing: -0.5px;
+  }
+  header p {
+    font-size: 14px;
+    opacity: 0.9;
+    font-weight: 300;
+  }
+  .badge {
+    display: inline-block;
+    background: rgba(255,255,255,0.2);
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    margin-top: 10px;
+    backdrop-filter: blur(10px);
+  }
+  /* 탭 네비게이션 */
+  .tabs {
+    display: flex;
+    background: #f7fafc;
+    border-bottom: 2px solid #e2e8f0;
+    overflow-x: auto;
+  }
+  .tab-btn {
+    flex: 1;
+    min-width: 150px;
+    padding: 18px 16px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    color: #718096;
+    transition: all 0.3s;
+    border-bottom: 3px solid transparent;
+    white-space: nowrap;
+  }
+  .tab-btn:hover {
+    background: #edf2f7;
+    color: #2c5282;
+  }
+  .tab-btn.active {
+    color: #2c5282;
+    border-bottom-color: #2c5282;
+    background: white;
+  }
+  .tab-btn .icon {
+    display: block;
+    font-size: 22px;
+    margin-bottom: 4px;
+  }
+  /* 탭 컨텐츠 */
+  .tab-content {
+    display: none;
+    padding: 40px;
+    min-height: 500px;
+  }
+  .tab-content.active {
+    display: block;
+    animation: fadeIn 0.4s;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  h2 {
+    font-size: 22px;
+    color: #1a365d;
+    margin-bottom: 8px;
+    font-weight: 800;
+  }
+  .subtitle {
+    color: #718096;
+    font-size: 14px;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  /* 입력 그룹 */
+  .input-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+    margin-bottom: 24px;
+  }
+  .input-card {
+    background: #f7fafc;
+    padding: 20px;
+    border-radius: 10px;
+    border: 1px solid #e2e8f0;
+  }
+  .input-card h3 {
+    font-size: 15px;
+    color: #1a365d;
+    margin-bottom: 12px;
+    font-weight: 700;
+  }
+  .input-card.danji-1 { border-left: 4px solid #e53e3e; }
+  .input-card.danji-2 { border-left: 4px solid #3182ce; }
+  .input-card.danji-3 { border-left: 4px solid #38a169; }
+  label {
+    display: block;
+    font-size: 12px;
+    color: #4a5568;
+    margin-bottom: 4px;
+    margin-top: 10px;
+    font-weight: 600;
+  }
+  input, select {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #cbd5e0;
+    border-radius: 6px;
+    font-size: 14px;
+    transition: all 0.2s;
+    background: white;
+  }
+  input:focus, select:focus {
+    outline: none;
+    border-color: #2c5282;
+    box-shadow: 0 0 0 3px rgba(44, 82, 130, 0.1);
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, #1a365d 0%, #2c5282 100%);
+    color: white;
+    border: none;
+    padding: 14px 32px;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s;
+    box-shadow: 0 4px 12px rgba(44, 82, 130, 0.3);
+  }
+  .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(44, 82, 130, 0.4);
+  }
+  .btn-secondary {
+    background: #edf2f7;
+    color: #2c5282;
+    border: 1px solid #cbd5e0;
+    padding: 10px 20px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-right: 8px;
+    margin-bottom: 8px;
+    transition: all 0.2s;
+  }
+  .btn-secondary:hover {
+    background: #2c5282;
+    color: white;
+  }
+  .button-row {
+    text-align: center;
+    margin: 24px 0;
+  }
+  /* 차트 영역 */
+  .chart-container {
+    background: white;
+    padding: 24px;
+    border-radius: 10px;
+    border: 1px solid #e2e8f0;
+    margin-top: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  }
+  .chart-wrapper {
+    position: relative;
+    height: 400px;
+  }
+  /* 결과 박스 */
+  .result-box {
+    margin-top: 20px;
+    padding: 24px;
+    background: linear-gradient(135deg, #ebf4ff 0%, #fff5f5 100%);
+    border-radius: 10px;
+    border: 1px solid #bee3f8;
+  }
+  .result-box h3 {
+    color: #1a365d;
+    font-size: 16px;
+    margin-bottom: 12px;
+    font-weight: 700;
+  }
+  .result-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+    margin-top: 16px;
+  }
+  .result-item {
+    background: white;
+    padding: 16px;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+  }
+  .result-item .label {
+    font-size: 12px;
+    color: #718096;
+    margin-bottom: 4px;
+  }
+  .result-item .value {
+    font-size: 22px;
+    font-weight: 800;
+    color: #1a365d;
+  }
+  .result-item .value.positive { color: #38a169; }
+  .result-item .value.negative { color: #e53e3e; }
+  .result-item .value.warning { color: #d69e2e; }
+  /* 체크리스트 */
+  .checklist-grid {
+    display: grid;
+    gap: 20px;
+  }
+  .checklist-item {
+    background: #f7fafc;
+    padding: 20px;
+    border-radius: 10px;
+    border: 1px solid #e2e8f0;
+  }
+  .checklist-item h4 {
+    color: #1a365d;
+    margin-bottom: 12px;
+    font-size: 15px;
+  }
+  .grade-buttons {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .grade-btn {
+    flex: 1;
+    min-width: 60px;
+    padding: 12px;
+    border: 2px solid #cbd5e0;
+    background: white;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 700;
+    transition: all 0.2s;
+  }
+  .grade-btn:hover { border-color: #2c5282; }
+  .grade-btn.selected { background: #2c5282; color: white; border-color: #2c5282; }
+  .grade-btn[data-grade="S"].selected { background: #d69e2e; border-color: #d69e2e; }
+  .grade-btn[data-grade="A"].selected { background: #38a169; border-color: #38a169; }
+  .grade-btn[data-grade="B"].selected { background: #3182ce; border-color: #3182ce; }
+  .grade-btn[data-grade="C"].selected { background: #718096; border-color: #718096; }
+  /* 학습 카드 */
+  .cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 20px;
+  }
+  .flip-card {
+    perspective: 1000px;
+    height: 220px;
+    cursor: pointer;
+  }
+  .flip-card-inner {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    transition: transform 0.6s;
+    transform-style: preserve-3d;
+  }
+  .flip-card.flipped .flip-card-inner {
+    transform: rotateY(180deg);
+  }
+  .flip-card-front, .flip-card-back {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    backface-visibility: hidden;
+    border-radius: 12px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  }
+  .flip-card-front {
+    background: linear-gradient(135deg, #1a365d 0%, #2c5282 100%);
+    color: white;
+  }
+  .flip-card-front .card-emoji {
+    font-size: 48px;
+    margin-bottom: 12px;
+  }
+  .flip-card-front h4 {
+    font-size: 17px;
+    margin-bottom: 8px;
+  }
+  .flip-card-front .hint {
+    font-size: 11px;
+    opacity: 0.8;
+    margin-top: 10px;
+  }
+  .flip-card-back {
+    background: white;
+    color: #2d3748;
+    transform: rotateY(180deg);
+    border: 2px solid #2c5282;
+    font-size: 13px;
+    line-height: 1.6;
+    text-align: left;
+    overflow-y: auto;
+  }
+  .flip-card-back strong { color: #1a365d; }
+  /* 정보 박스 */
+  .info-banner {
+    background: linear-gradient(135deg, #fff5e6 0%, #ffe5b4 100%);
+    border-left: 4px solid #d69e2e;
+    padding: 16px 20px;
+    border-radius: 6px;
+    margin-bottom: 20px;
+    font-size: 13px;
+    color: #744210;
+  }
+  .info-banner strong { color: #5f370e; }
+  .api-step {
+    background: white;
+    padding: 16px;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    border-left: 3px solid #2c5282;
+  }
+  .api-step .step-num {
+    display: inline-block;
+    background: #2c5282;
+    color: white;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    text-align: center;
+    line-height: 28px;
+    font-weight: 700;
+    margin-right: 10px;
+  }
+  /* 인사이트 박스 */
+  .insight-box {
+    background: linear-gradient(135deg, #f0fff4 0%, #c6f6d5 100%);
+    border-left: 4px solid #38a169;
+    padding: 16px 20px;
+    border-radius: 6px;
+    margin-top: 16px;
+    font-size: 13px;
+    color: #22543d;
+  }
+  .warning-box {
+    background: linear-gradient(135deg, #fff5f5 0%, #fed7d7 100%);
+    border-left: 4px solid #e53e3e;
+    padding: 16px 20px;
+    border-radius: 6px;
+    margin-top: 16px;
+    font-size: 13px;
+    color: #742a2a;
+  }
+  /* 푸터 */
+  footer {
+    background: #1a365d;
+    color: white;
+    padding: 20px 40px;
+    text-align: center;
+    font-size: 12px;
+    opacity: 0.9;
+  }
+  @media (max-width: 768px) {
+    body { padding: 10px; }
+    .tab-content { padding: 20px; }
+    header { padding: 20px; }
+    header h1 { font-size: 20px; }
+    .tab-btn { font-size: 12px; padding: 14px 8px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>🏢 부린이 원리이해</h1>
+    <p>가격비교를 통한 저평가 아파트 찾기 · 부동산 의사결정 종합 도구</p>
+    <span class="badge">v1.0 · 부동산 이론 기반</span>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab-btn active" data-tab="cycle">
+      <span class="icon">📈</span>사이클 진단
+    </button>
+    <button class="tab-btn" data-tab="location">
+      <span class="icon">📍</span>입지 평가
+    </button>
+    <button class="tab-btn" data-tab="compare">
+      <span class="icon">📊</span>가격비교 분석
+    </button>
+    <button class="tab-btn" data-tab="gap">
+      <span class="icon">💰</span>갭투자 계산기
+    </button>
+    <button class="tab-btn" data-tab="learn">
+      <span class="icon">📚</span>이론 학습
+    </button>
+    <button class="tab-btn" data-tab="api">
+      <span class="icon">🔗</span>API 설정
+    </button>
+    <button class="tab-btn" data-tab="help">
+      <span class="icon">❓</span>도움말
+    </button>
+  </nav>
+
+  <!-- 탭 1: 사이클 진단 (NEW - 최우선) -->
+  <div class="tab-content active" id="cycle">
+    <h2>📈 부동산 사이클 진단 — 지금 시장은 어느 국면인가?</h2>
+    <p class="subtitle">PDF 벌집순환모형: 거래량과 가격 변화로 9개 국면 중 어디인지 진단합니다. 같은 시기여도 지역마다 국면이 다릅니다 (갭벌리기/갭메우기 원리).</p>
+
+    <div class="info-banner">
+      <strong>💡 사용법:</strong> ⑥ "API 설정" 탭에서 공공데이터 API 키를 먼저 등록하세요. 그 후 아래에서 관심 지역을 추가하고 "전체 진단"을 누르면 됩니다.
+      <br>※ 진단 기준: 거래량 ±10% 이내 = 보합, 가격 ±1% 이내 = 보합 (PDF 강사의 "짧은 시계열 경고" 반영)
+    </div>
+
+    <!-- 관심 지역 관리 -->
+    <div style="background:#f7fafc;padding:20px;border-radius:10px;margin-bottom:20px;border:1px solid #e2e8f0;">
+      <h3 style="color:#1a365d;margin-bottom:12px;font-size:16px;">📍 관심 지역 관리</h3>
+      <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end;">
+        <div>
+          <label>지역명 (별칭)</label>
+          <input type="text" id="newRegionName" placeholder="예: 강남구">
+        </div>
+        <div>
+          <label>지역코드 (LAWD_CD 5자리)</label>
+          <input type="text" id="newRegionCode" placeholder="예: 11680" maxlength="5">
+        </div>
+        <button class="btn-primary" onclick="addRegion()" style="padding:10px 20px;">➕ 추가</button>
+      </div>
+      <div style="margin-top:12px;font-size:12px;color:#718096;">
+        💡 지역코드를 모르시면 "API 설정" 탭 하단의 지역코드 표를 참고하세요.
+      </div>
+      <div id="regionList" style="margin-top:16px;display:flex;flex-wrap:wrap;gap:8px;"></div>
+    </div>
+
+    <div class="button-row">
+      <button class="btn-primary" onclick="diagnoseAll()">🔍 전체 지역 진단 시작</button>
+      <button class="btn-secondary" onclick="loadDemoRegions()">📋 데모 지역 불러오기</button>
+    </div>
+
+    <div id="cycleResult"></div>
+  </div>
+
+  <!-- 탭 2: 가격비교 분석 v2 — 20년 자동화 -->
+  <div class="tab-content" id="compare">
+    <h2>📊 3개 단지 20년 가격비교 분석</h2>
+    <p class="subtitle">PDF 핵심 메서드: "과거에 겹쳤다면, 현재 싼 쪽이 저평가" — 2006년부터 현재까지 공공 실거래가를 자동 수집해 분석합니다.</p>
+
+    <!-- 다운로드 진행률 바 -->
+    <div id="pcProgressBar" style="display:none;background:#ebf4ff;border:1px solid #bee3f8;border-radius:10px;padding:16px 20px;margin-bottom:20px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <span id="pcProgressLabel" style="font-size:13px;color:#1a365d;font-weight:600;">20년치 데이터 다운로드 중...</span>
+        <span id="pcProgressPct" style="font-size:13px;color:#2c5282;font-weight:700;">0%</span>
+      </div>
+      <div style="background:#bee3f8;border-radius:4px;height:8px;overflow:hidden;">
+        <div id="pcProgressFill" style="height:100%;background:linear-gradient(90deg,#2c5282,#3182ce);border-radius:4px;width:0%;transition:width 0.3s;"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-top:8px;">
+        <span id="pcProgressDetail" style="font-size:11px;color:#4a5568;">준비 중...</span>
+        <button onclick="pcAbort()" style="font-size:11px;color:#e53e3e;background:none;border:1px solid #e53e3e;border-radius:4px;padding:2px 10px;cursor:pointer;">⏹ 중단</button>
+      </div>
+    </div>
+
+    <div class="info-banner">
+      <strong>💡 사용법:</strong> 비교할 3개 단지의 지역과 단지명 키워드를 입력 후 "20년 분석 시작"을 누르세요.<br>
+      첫 실행 시 약 1시간 소요 (최대 735회 API 호출). 이후에는 IndexedDB 캐시로 <strong>즉시 분석</strong>됩니다.<br>
+      지역 목록은 "사이클 진단" 탭에서 추가한 관심 지역이 자동으로 표시됩니다.
+    </div>
+
+    <div class="button-row">
+      <button class="btn-secondary" onclick="pcLoadExample('seonsa')">예시1: 선사현대 vs 신도림대림 vs 답십리두산</button>
+      <button class="btn-secondary" onclick="pcLoadExample('bundang')">예시2: 분당 vs 수지 vs 화성</button>
+      <button class="btn-secondary" onclick="pcClear()">초기화</button>
+    </div>
+
+    <div class="input-grid">
+      <div class="input-card danji-1">
+        <h3>🔴 단지 A</h3>
+        <label>지역 선택</label>
+        <select id="pc_region1"><option value="">— 지역 선택 —</option></select>
+        <label>단지명 키워드</label>
+        <input type="text" id="pc_keyword1" placeholder="예: 선사현대">
+        <label>평형 (선택, 예: 33)</label>
+        <input type="number" id="pc_area1" placeholder="미입력 시 전체 평형" step="1" min="10" max="100">
+      </div>
+      <div class="input-card danji-2">
+        <h3>🔵 단지 B</h3>
+        <label>지역 선택</label>
+        <select id="pc_region2"><option value="">— 지역 선택 —</option></select>
+        <label>단지명 키워드</label>
+        <input type="text" id="pc_keyword2" placeholder="예: 신도림대림">
+        <label>평형 (선택, 예: 33)</label>
+        <input type="number" id="pc_area2" placeholder="미입력 시 전체 평형" step="1" min="10" max="100">
+      </div>
+      <div class="input-card danji-3">
+        <h3>🟢 단지 C</h3>
+        <label>지역 선택</label>
+        <select id="pc_region3"><option value="">— 지역 선택 —</option></select>
+        <label>단지명 키워드</label>
+        <input type="text" id="pc_keyword3" placeholder="예: 답십리두산">
+        <label>평형 (선택, 예: 33)</label>
+        <input type="number" id="pc_area3" placeholder="미입력 시 전체 평형" step="1" min="10" max="100">
+      </div>
+    </div>
+
+    <div class="button-row">
+      <button class="btn-primary" id="pcStartBtn" onclick="pcStartAnalysis()">🔍 20년 분석 시작</button>
+    </div>
+
+    <div class="chart-container" id="pcChartArea" style="display:none;">
+      <h3 style="margin-bottom:4px;color:#1a365d;">📈 20년 실거래가 시계열 비교</h3>
+      <p style="font-size:12px;color:#718096;margin-bottom:16px;">노란 음영: 3개 단지 가격이 겹쳤던 구간 (PDF 100쪽 핵심 — 갈아타기 기회였던 시기)</p>
+      <div class="chart-wrapper" style="height:420px;">
+        <canvas id="pcCompareChart"></canvas>
+      </div>
+    </div>
+
+    <div id="pcResult"></div>
+  </div>
+
+  <!-- 탭 2: 갭투자 계산기 -->
+  <div class="tab-content" id="gap">
+    <h2>💰 갭투자 수익률 계산기</h2>
+    <p class="subtitle">PDF 원리: 갭투자는 양날의 검 — 수익률과 역전세 리스크를 미리 시뮬레이션하세요.</p>
+
+    <div class="input-grid">
+      <div class="input-card">
+        <h3>📌 매수 정보</h3>
+        <label>매매가 (억)</label>
+        <input type="number" id="gapPrice" step="0.1" value="5">
+        <label>전세가 (억)</label>
+        <input type="number" id="gapJeonse" step="0.1" value="4">
+        <label>취득세 등 부대비용 (만원)</label>
+        <input type="number" id="gapTax" step="100" value="500">
+      </div>
+      <div class="input-card">
+        <h3>📈 시나리오 예측</h3>
+        <label>예상 매매가 상승률 (%)</label>
+        <input type="number" id="gapRise" step="1" value="20">
+        <label>예상 전세가 변동률 (%) ※마이너스면 역전세</label>
+        <input type="number" id="gapJeonseChange" step="1" value="10">
+        <label>보유 기간 (년)</label>
+        <input type="number" id="gapYears" step="1" value="3">
+      </div>
+    </div>
+
+    <div class="button-row">
+      <button class="btn-primary" onclick="calculateGap()">💵 수익률 계산하기</button>
+    </div>
+
+    <div id="gapResult"></div>
+  </div>
+
+  <!-- 탭 3: 입지 평가 -->
+  <div class="tab-content" id="location">
+    <h2>📍 입지 평가 체크리스트</h2>
+    <p class="subtitle">PDF의 S/A/B/C 평가표 기반 — 5개 핵심 입지요소를 점수화하여 종합 등급을 산출합니다.</p>
+
+    <div class="info-banner">
+      <strong>💡 입지 평가 5요소:</strong> 직장 · 교통 · 학군 · 환경 · 공급 — 각 항목을 클릭하여 등급을 선택하세요.
+    </div>
+
+    <div class="checklist-grid">
+      <div class="checklist-item">
+        <h4>💼 직장 (일자리)</h4>
+        <p style="font-size:12px;color:#718096;margin-bottom:10px;">S: 근로자수 30만명 이상 / A: 20만 / B: 10만 / C: 10만 미만</p>
+        <div class="grade-buttons" data-category="job">
+          <button class="grade-btn" data-grade="S">S</button>
+          <button class="grade-btn" data-grade="A">A</button>
+          <button class="grade-btn" data-grade="B">B</button>
+          <button class="grade-btn" data-grade="C">C</button>
+        </div>
+      </div>
+      <div class="checklist-item">
+        <h4>🚇 교통</h4>
+        <p style="font-size:12px;color:#718096;margin-bottom:10px;">S: 강남 30분 이내 / A: 강남 1시간, 부도심 30분 / B: 부도심 1시간 / C: 그 외</p>
+        <div class="grade-buttons" data-category="transport">
+          <button class="grade-btn" data-grade="S">S</button>
+          <button class="grade-btn" data-grade="A">A</button>
+          <button class="grade-btn" data-grade="B">B</button>
+          <button class="grade-btn" data-grade="C">C</button>
+        </div>
+      </div>
+      <div class="checklist-item">
+        <h4>🎓 학군</h4>
+        <p style="font-size:12px;color:#718096;margin-bottom:10px;">S: 학업성취도 95% 이상 / A: 90% / B: 85% / C: 85% 미만</p>
+        <div class="grade-buttons" data-category="school">
+          <button class="grade-btn" data-grade="S">S</button>
+          <button class="grade-btn" data-grade="A">A</button>
+          <button class="grade-btn" data-grade="B">B</button>
+          <button class="grade-btn" data-grade="C">C</button>
+        </div>
+      </div>
+      <div class="checklist-item">
+        <h4>🛒 환경/상권</h4>
+        <p style="font-size:12px;color:#718096;margin-bottom:10px;">S: 1km 내 백화점 2개 이상 / A: 백화점 1개 이상 / B: 대형마트 / C: 그 외</p>
+        <div class="grade-buttons" data-category="env">
+          <button class="grade-btn" data-grade="S">S</button>
+          <button class="grade-btn" data-grade="A">A</button>
+          <button class="grade-btn" data-grade="B">B</button>
+          <button class="grade-btn" data-grade="C">C</button>
+        </div>
+      </div>
+      <div class="checklist-item">
+        <h4>🏗️ 공급</h4>
+        <p style="font-size:12px;color:#718096;margin-bottom:10px;">S: 입주물량 없음 / A: 인구수 대비 0.5% 이하 / B: 0.5%~1% / C: 1% 초과</p>
+        <div class="grade-buttons" data-category="supply">
+          <button class="grade-btn" data-grade="S">S</button>
+          <button class="grade-btn" data-grade="A">A</button>
+          <button class="grade-btn" data-grade="B">B</button>
+          <button class="grade-btn" data-grade="C">C</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="button-row">
+      <button class="btn-primary" onclick="evaluateLocation()">📊 종합 평가 보기</button>
+    </div>
+
+    <div id="locationResult"></div>
+  </div>
+
+  <!-- 탭 4: 이론 학습 -->
+  <div class="tab-content" id="learn">
+    <h2>📚 부동산 이론 학습 카드</h2>
+    <p class="subtitle">카드를 클릭하면 뒷면이 나타납니다. PDF의 핵심 개념 12가지를 정리했습니다.</p>
+
+    <div class="cards-grid" id="cardsContainer">
+      <!-- JS로 생성 -->
+    </div>
+  </div>
+
+  <!-- 탭 5: API 연동 -->
+  <div class="tab-content" id="api">
+    <h2>🔗 국토교통부 실거래가 API 연동</h2>
+    <p class="subtitle">합법적이고 정확한 공공데이터를 활용해 실시간 시세를 가져올 수 있습니다.</p>
+
+    <div class="info-banner">
+      <strong>📌 안내:</strong> 공공데이터포털에서 무료로 API 키를 발급받으실 수 있습니다. 발급에 1~2일 소요됩니다.
+    </div>
+
+    <div class="api-step">
+      <span class="step-num">1</span>
+      <strong>공공데이터포털 회원가입</strong>
+      <p style="margin-top:8px;color:#4a5568;font-size:14px;">
+        🌐 <a href="https://www.data.go.kr" target="_blank" style="color:#2c5282;">www.data.go.kr</a> 접속 → 회원가입 (무료)
+      </p>
+    </div>
+
+    <div class="api-step">
+      <span class="step-num">2</span>
+      <strong>"국토교통부 아파트매매 실거래가 자료" 검색</strong>
+      <p style="margin-top:8px;color:#4a5568;font-size:14px;">
+        검색창에 위 키워드 입력 → 오픈 API 신청 (활용 목적: 개인 학습 등 자유롭게 작성)
+      </p>
+    </div>
+
+    <div class="api-step">
+      <span class="step-num">3</span>
+      <strong>승인 후 인증키(Service Key) 발급</strong>
+      <p style="margin-top:8px;color:#4a5568;font-size:14px;">
+        마이페이지 → 오픈 API → 인증키 발급현황에서 확인 가능
+      </p>
+    </div>
+
+    <div class="api-step">
+      <span class="step-num">4</span>
+      <strong>아래에 API 키를 입력하여 연동 테스트</strong>
+      <label style="margin-top:12px;">서비스 키 (Service Key) — 한 번 입력하면 브라우저에 저장됩니다</label>
+      <input type="text" id="apiKey" placeholder="발급받은 인증키를 입력하세요" oninput="localStorage.setItem('apiKey', this.value)">
+      <label>지역코드 (예: 11680 = 강남구)</label>
+      <input type="text" id="lawdCd" placeholder="11680" value="11680">
+      <label>거래월 (YYYYMM)</label>
+      <input type="text" id="dealYmd" placeholder="202504" value="202504">
+      <div style="margin-top:16px;">
+        <button class="btn-primary" onclick="testAPI()">🔍 API 연결 테스트</button>
+        <button class="btn-primary" onclick="showKeyTransferQR()" style="background:#2c5282;margin-left:8px;">📱 휴대폰으로 가져가기 (QR)</button>
+      </div>
+      <div id="apiResult" style="margin-top:16px;"></div>
+      <div id="qrTransferBox" style="display:none;margin-top:20px;padding:20px;background:#f7fafc;border-radius:12px;border:2px dashed #cbd5e0;text-align:center;">
+        <div style="font-weight:600;color:#1a365d;margin-bottom:12px;">📱 휴대폰 카메라로 아래 QR을 스캔하세요</div>
+        <div id="qrCodeImage" style="display:inline-block;padding:12px;background:white;border-radius:8px;"></div>
+        <div style="margin-top:14px;font-size:13px;color:#4a5568;line-height:1.6;">
+          ① 휴대폰의 <strong>기본 카메라 앱</strong> 실행<br>
+          ② QR 코드를 비추면 화면 위에 링크가 뜸<br>
+          ③ 링크 탭 → 휴대폰 브라우저에 자동으로 키가 입력됩니다
+        </div>
+        <div style="margin-top:14px;font-size:12px;color:#9b2c2c;background:#fff5f5;padding:10px;border-radius:6px;">
+          ⚠️ 이 QR에는 본인 API 키가 들어있습니다. 다른 사람이 보는 화면에서 띄우지 마세요.
+        </div>
+        <button onclick="hideKeyTransferQR()" style="margin-top:12px;padding:8px 20px;background:#e2e8f0;border:none;border-radius:6px;cursor:pointer;color:#4a5568;">닫기</button>
+      </div>
+    </div>
+
+    <div class="warning-box">
+      <strong>⚠️ 주의:</strong> CORS 정책으로 인해 브라우저에서 직접 호출이 제한될 수 있습니다.
+      실제 사용 시에는 백엔드 프록시 서버 또는 CORS 우회 도구가 필요할 수 있어요.
+      이 앱에서는 API 키 발급 안내 및 연동 준비를 위한 가이드로 활용해주세요.
+    </div>
+
+    <h3 style="margin-top:30px;color:#1a365d;">📍 주요 지역코드 (LAWD_CD) 참고</h3>
+    <div style="background:#f7fafc;padding:16px;border-radius:8px;margin-top:12px;font-size:13px;">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px,1fr));gap:8px;">
+        <div>🔹 강남구: <strong>11680</strong></div>
+        <div>🔹 서초구: <strong>11650</strong></div>
+        <div>🔹 송파구: <strong>11710</strong></div>
+        <div>🔹 강동구: <strong>11740</strong></div>
+        <div>🔹 마포구: <strong>11440</strong></div>
+        <div>🔹 성동구: <strong>11200</strong></div>
+        <div>🔹 분당구(성남): <strong>41135</strong></div>
+        <div>🔹 수지구(용인): <strong>41465</strong></div>
+        <div>🔹 화성시: <strong>41590</strong></div>
+        <div>🔹 일산동구(고양): <strong>41285</strong></div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- 탭 7: 도움말 (가족용 사용 안내) -->
+  <div class="tab-content" id="help">
+    <h2>❓ 사용 안내 — 처음 사용하시는 분께</h2>
+    <p class="subtitle">이 앱은 국토교통부 실거래가 데이터를 직접 가져옵니다. 무료지만 본인 API 키 발급이 필요해요.</p>
+
+    <div class="info-banner">
+      <strong>📌 전체 흐름:</strong> ① 공공데이터포털 키 발급 (1~2시간) → ② "API 설정" 탭에 키 입력 → ③ 관심 지역 추가 → ④ 진단 실행
+    </div>
+
+    <h3 style="margin-top:30px;color:#1a365d;">1️⃣ 공공데이터 API 키 발급받기 (한 번만)</h3>
+
+    <div class="api-step">
+      <span class="step-num">1</span>
+      <strong>공공데이터포털 접속 및 가입</strong>
+      <p style="margin-top:8px;color:#4a5568;font-size:14px;">
+        🌐 <a href="https://www.data.go.kr" target="_blank" style="color:#2c5282;">www.data.go.kr</a> 접속 → 회원가입 (네이버/카카오 간편로그인 가능)
+      </p>
+    </div>
+
+    <div class="api-step">
+      <span class="step-num">2</span>
+      <strong>API 검색</strong>
+      <p style="margin-top:8px;color:#4a5568;font-size:14px;">
+        상단 검색창에 <strong>"아파트 매매 실거래가 상세자료"</strong> 입력<br>
+        → 결과 중 "국토교통부_아파트 매매 실거래가 상세자료" 클릭
+      </p>
+    </div>
+
+    <div class="api-step">
+      <span class="step-num">3</span>
+      <strong>활용 신청</strong>
+      <p style="margin-top:8px;color:#4a5568;font-size:14px;">
+        우측 <strong>활용신청</strong> 버튼 클릭<br>
+        → 활용 목적: <em>개인 학습</em> 등 자유 작성<br>
+        → 라이선스 동의 체크 → 신청 완료
+      </p>
+    </div>
+
+    <div class="api-step">
+      <span class="step-num">4</span>
+      <strong>인증키 확인 (1~2시간 후 자동 승인)</strong>
+      <p style="margin-top:8px;color:#4a5568;font-size:14px;">
+        마이페이지 → <strong>오픈 API → 인증키 발급현황</strong><br>
+        → <strong>일반 인증키(Encoding)</strong> 옆 복사 버튼 클릭
+      </p>
+    </div>
+
+    <div class="warning-box" style="margin-top:16px;">
+      💡 <strong>Encoding 키</strong>와 Decoding 키 두 개가 보입니다. 반드시 <strong>Encoding 키</strong>를 복사하세요.
+    </div>
+
+    <h3 style="margin-top:30px;color:#1a365d;">2️⃣ 앱에 API 키 등록</h3>
+    <div class="api-step">
+      <span class="step-num">●</span>
+      <strong>"🔗 API 설정" 탭으로 이동</strong>
+      <p style="margin-top:8px;color:#4a5568;font-size:14px;">
+        상단 탭 메뉴에서 <strong>🔗 API 설정</strong> 클릭<br>
+        → 입력창에 복사한 Encoding 키 붙여넣기<br>
+        → <strong>🔍 API 연결 테스트</strong> 클릭하여 "✅ 정상 연결" 확인<br>
+        → 키는 자동 저장되어 다음에 열 때 다시 입력할 필요 없음
+      </p>
+      <div style="margin-top:12px;">
+        <button class="btn-primary" onclick="document.querySelector('[data-tab=&quot;api&quot;]').click()">🔗 API 설정 탭으로 바로가기</button>
+      </div>
+    </div>
+
+    <div class="insight-box" style="margin-top:16px;">
+      <strong>💡 PC ↔ 휴대폰 키 동기화 (QR 이전 기능):</strong><br>
+      API 키는 기기마다 따로 저장되어, 보통은 PC와 휴대폰에 각각 입력해야 합니다.<br>
+      이 앱은 <strong>QR로 키를 옮기는 기능</strong>을 제공합니다:<br>
+      ① PC에서 키 입력 후 <strong>"🔗 API 설정"</strong> 탭의 <strong>"📱 휴대폰으로 가져가기 (QR)"</strong> 버튼 클릭<br>
+      ② 휴대폰 기본 카메라 앱으로 화면의 QR 스캔<br>
+      ③ 화면에 뜨는 링크 탭 → 휴대폰에도 자동 입력 완료<br>
+      <span style="color:#9b2c2c;font-size:13px;">⚠️ QR에 키가 들어있으니 본인 또는 가족만 보는 화면에서만 띄우세요.</span>
+    </div>
+
+    <h3 style="margin-top:30px;color:#1a365d;">3️⃣ 휴대폰 홈 화면에 앱처럼 설치하기</h3>
+    <p style="color:#4a5568;font-size:14px;margin-top:8px;">홈 화면에 추가하면 일반 앱처럼 아이콘으로 바로 실행됩니다.</p>
+
+    <div class="api-step">
+      <span class="step-num">📱</span>
+      <strong>아이폰 / 아이패드 (Safari 사용)</strong>
+      <p style="margin-top:8px;color:#4a5568;font-size:14px;">
+        ① 이 페이지를 <strong>Safari</strong>에서 열기 (⚠️ Chrome 아님)<br>
+        ② 하단 가운데 <strong>공유 버튼 📤</strong> 탭<br>
+        ③ 메뉴에서 <strong>"홈 화면에 추가"</strong> 선택<br>
+        ④ 우측 상단 <strong>추가</strong> 탭
+      </p>
+    </div>
+
+    <div class="api-step">
+      <span class="step-num">📱</span>
+      <strong>안드로이드 (Chrome 사용)</strong>
+      <p style="margin-top:8px;color:#4a5568;font-size:14px;">
+        ① 이 페이지를 <strong>Chrome</strong>에서 열기<br>
+        ② 우측 상단 <strong>⋮ (점 세 개)</strong> 메뉴 탭<br>
+        ③ <strong>"홈 화면에 추가"</strong> 또는 <strong>"앱 설치"</strong> 선택<br>
+        ④ 안내에 따라 추가
+      </p>
+    </div>
+
+    <h3 style="margin-top:30px;color:#1a365d;">4️⃣ 사용 시작</h3>
+    <div class="insight-box">
+      <strong>🎯 처음 사용 순서:</strong><br>
+      ① <strong>📈 사이클 진단</strong> 탭 → 관심 지역 추가 (또는 "데모 지역 불러오기")<br>
+      ② <strong>전체 지역 진단 시작</strong> 버튼 클릭<br>
+      ③ 첫 실행 시 데이터 수집에 최대 1시간 소요 (이후엔 캐시되어 즉시 분석)
+    </div>
+
+    <h3 style="margin-top:30px;color:#1a365d;">❓ 자주 묻는 질문</h3>
+
+    <div class="api-step">
+      <strong>Q. 내 API 키는 안전한가요?</strong>
+      <p style="margin-top:8px;color:#4a5568;font-size:14px;">
+        키는 본인의 브라우저(휴대폰/PC)에만 저장됩니다. 외부 서버로 전송되지 않아요.
+      </p>
+    </div>
+
+    <div class="api-step">
+      <strong>Q. 일일 호출 한도가 있나요?</strong>
+      <p style="margin-top:8px;color:#4a5568;font-size:14px;">
+        공공데이터포털 기본 한도는 <strong>하루 10,000건</strong>입니다. 일반 사용엔 충분합니다.
+      </p>
+    </div>
+
+    <div class="api-step">
+      <strong>Q. 인터넷이 안 될 때도 쓸 수 있나요?</strong>
+      <p style="margin-top:8px;color:#4a5568;font-size:14px;">
+        한 번 열어본 적이 있다면 오프라인에서도 앱 화면은 열립니다. 다만 새 실거래 데이터를 받아오려면 인터넷이 필요합니다.
+      </p>
+    </div>
+
+    <div class="api-step">
+      <strong>Q. 데이터가 안 보여요</strong>
+      <p style="margin-top:8px;color:#4a5568;font-size:14px;">
+        ① API 키가 정확히 입력됐는지 (앞뒤 공백 없이)<br>
+        ② 발급 후 1~2시간 지났는지 (즉시 활성화 안 될 수 있음)<br>
+        ③ "🔗 API 설정" 탭의 "API 연결 테스트" 버튼으로 먼저 확인
+      </p>
+    </div>
+
+    <div class="warning-box" style="margin-top:24px;">
+      <strong>⚠️ 면책:</strong> 이 앱은 학습 목적의 참고 도구입니다. 투자 결과의 책임은 본인에게 있습니다.
+    </div>
+  </div>
+
+  <footer>
+    <p>📖 본 앱은 "리치래빗의 부린이 원리이해" 강의 이론을 토대로 제작된 학습용 도구입니다.</p>
+    <p style="margin-top:6px;opacity:0.7;">투자 결과의 책임은 본인에게 있으며, 이 앱은 참고용 자료일 뿐입니다.</p>
+  </footer>
+</div>
+
+<script>
+// ============ 탭 전환 ============
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(btn.dataset.tab).classList.add('active');
+  });
+});
+
+// ============================================================
+// 📊 가격비교 분석 v2 — 20년 자동화 + IndexedDB 캐시
+// ============================================================
+
+// — IndexedDB —
+const PC_DB_NAME = 'priceCompareDB';
+const PC_DB_VER = 1;
+const PC_STORE = 'monthlyDeals';
+let pcDB = null;
+let pcAborted = false;
+
+async function initPcDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(PC_DB_NAME, PC_DB_VER);
+    req.onupgradeneeded = e => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains(PC_STORE)) {
+        db.createObjectStore(PC_STORE, { keyPath: 'id' });
+      }
+    };
+    req.onsuccess = e => { pcDB = e.target.result; resolve(pcDB); };
+    req.onerror = e => { console.warn('IndexedDB 초기화 실패:', e); reject(e); };
+  });
+}
+
+async function pcDbGet(id) {
+  if (!pcDB) await initPcDB();
+  return new Promise((resolve, reject) => {
+    const tx = pcDB.transaction(PC_STORE, 'readonly');
+    const req = tx.objectStore(PC_STORE).get(id);
+    req.onsuccess = e => resolve(e.target.result);
+    req.onerror = () => resolve(null);
+  });
+}
+
+async function pcDbPut(data) {
+  if (!pcDB) return;
+  return new Promise((resolve) => {
+    const tx = pcDB.transaction(PC_STORE, 'readwrite');
+    tx.objectStore(PC_STORE).put(data);
+    tx.oncomplete = resolve;
+    tx.onerror = resolve;
+  });
+}
+
+// — 유틸리티 —
+function pcDelay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function pcGetAllMonths() {
+  const months = [];
+  const now = new Date();
+  let cur = new Date(2006, 0, 1);
+  const end = new Date(now.getFullYear(), now.getMonth(), 1);
+  while (cur <= end) {
+    months.push(cur.getFullYear().toString() + String(cur.getMonth() + 1).padStart(2, '0'));
+    cur.setMonth(cur.getMonth() + 1);
+  }
+  return months;
+}
+
+function pcIsRecentMonth(ym) {
+  const now = new Date();
+  for (let i = 0; i < 3; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    if ((d.getFullYear().toString() + String(d.getMonth() + 1).padStart(2, '0')) === ym) return true;
+  }
+  return false;
+}
+
+// — API 호출 (재시도 포함) —
+async function pcFetchWithRetry(url, retries = 3) {
+  let lastErr;
+  for (let i = 0; i < retries; i++) {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.text();
+    } catch (e) {
+      lastErr = e;
+      if (i < retries - 1) await pcDelay(1000 * (i + 1));
+    }
+  }
+  throw lastErr;
+}
+
+async function pcFetchMonth(apiKey, lawdCd, dealYmd) {
+  const id = `${lawdCd}_${dealYmd}`;
+
+  if (!pcIsRecentMonth(dealYmd)) {
+    try {
+      const cached = await pcDbGet(id);
+      if (cached) return cached.deals;
+    } catch (e) { /* 캐시 오류 무시 */ }
+  }
+
+  const apiUrl = `${API_BASE}?serviceKey=${encodeURIComponent(apiKey)}&LAWD_CD=${lawdCd}&DEAL_YMD=${dealYmd}&numOfRows=1000&pageNo=1`;
+  const xml = await pcFetchWithRetry(CORS_PROXY + encodeURIComponent(apiUrl));
+  const doc = new DOMParser().parseFromString(xml, 'text/xml');
+  const items = doc.getElementsByTagName('item');
+  const deals = [];
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    const g = tag => { const el = item.getElementsByTagName(tag)[0]; return el ? el.textContent.trim() : ''; };
+    const aptNm = g('aptNm');
+    const excluUseAr = parseFloat(g('excluUseAr')) || 0;
+    const amount = parseInt((g('dealAmount') || g('거래금액')).replace(/[^0-9]/g, '')) || 0;
+    if (!aptNm || amount <= 0) continue;
+    deals.push({ aptNm, area: excluUseAr, amount: amount / 10000 });
+  }
+
+  await pcDbPut({ id, lawdCd, dealYmd, fetchedAt: Date.now(), deals });
+  return deals;
+}
+
+// — 필터 & 집계 —
+function pcFilterDeals(deals, keyword, areaPyeong) {
+  let filtered = deals.filter(d => d.aptNm && d.aptNm.includes(keyword));
+  if (areaPyeong > 0) {
+    const targetM2 = areaPyeong * 3.30579;
+    filtered = filtered.filter(d => Math.abs(d.area - targetM2) <= 5);
+  }
+  return filtered;
+}
+
+function pcCalcAvg(deals) {
+  if (!deals.length) return null;
+  const sum = deals.reduce((s, d) => s + d.amount, 0);
+  return { avg: +(sum / deals.length).toFixed(2), count: deals.length };
+}
+
+// — 시계열 보간 —
+function pcInterpolate(series, months) {
+  const result = {};
+  months.forEach(m => { if (series[m]) result[m] = series[m]; });
+  for (let i = 0; i < months.length; i++) {
+    const m = months[i];
+    if (result[m]) continue;
+    let before = null, after = null;
+    for (let j = i - 1; j >= 0; j--) {
+      if (result[months[j]] && result[months[j]].count > 0) { before = { idx: j, avg: result[months[j]].avg }; break; }
+    }
+    for (let j = i + 1; j < months.length; j++) {
+      if (result[months[j]] && result[months[j]].count > 0) { after = { idx: j, avg: result[months[j]].avg }; break; }
+    }
+    if (before && after) {
+      const t = (i - before.idx) / (after.idx - before.idx);
+      result[m] = { avg: +(before.avg + (after.avg - before.avg) * t).toFixed(2), count: 0, interp: true };
+    } else if (before) {
+      result[m] = { avg: before.avg, count: 0, interp: true };
+    } else if (after) {
+      result[m] = { avg: after.avg, count: 0, interp: true };
+    }
+  }
+  return result;
+}
+
+// — 겹침 구간 탐지 (PDF 100쪽 핵심) —
+function pcFindOverlaps(sA, sB, sC, months) {
+  const overlaps = [];
+  let startM = null, runLen = 0, startIdx = -1;
+  for (let i = 0; i < months.length; i++) {
+    const m = months[i];
+    const prices = [sA[m], sB[m], sC[m]].filter(x => x && x.avg > 0).map(x => x.avg);
+    if (prices.length < 2) { if (startM && runLen >= 6) overlaps.push({ startIdx, endIdx: i - 1 }); startM = null; runLen = 0; continue; }
+    const spread = (Math.max(...prices) - Math.min(...prices)) / Math.min(...prices);
+    if (spread <= 0.20) {
+      if (!startM) { startM = m; startIdx = i; }
+      runLen++;
+    } else {
+      if (startM && runLen >= 6) overlaps.push({ startIdx, endIdx: i - 1 });
+      startM = null; runLen = 0;
+    }
+  }
+  if (startM && runLen >= 6) overlaps.push({ startIdx, endIdx: months.length - 1 });
+  return overlaps;
+}
+
+// — 저평가 단지 추천 —
+function pcFindUndervalued(sA, sB, sC, names, months) {
+  const series = [sA, sB, sC];
+  const currentPrices = series.map((s, idx) => {
+    if (!names[idx] || !Object.keys(s).length) return null;
+    for (let i = months.length - 1; i >= Math.max(0, months.length - 12); i--) {
+      const v = s[months[i]]; if (v && v.count > 0) return v.avg;
+    }
+    for (let i = months.length - 1; i >= 0; i--) {
+      const v = s[months[i]]; if (v && v.avg > 0) return v.avg;
+    }
+    return null;
+  });
+
+  const pairs = [{ i: 0, j: 1 }, { i: 0, j: 2 }, { i: 1, j: 2 }];
+  const results = pairs.map(({ i, j }) => {
+    if (!currentPrices[i] || !currentPrices[j] || !names[i] || !names[j]) return null;
+    const common = months.filter(m => series[i][m] && series[j][m] && series[i][m].avg > 0 && series[j][m].avg > 0 && !series[i][m].interp && !series[j][m].interp);
+    if (!common.length) return null;
+    const gaps = common.map(m => Math.abs(series[i][m].avg - series[j][m].avg) / Math.max(series[i][m].avg, series[j][m].avg));
+    if (!gaps.length) return null;
+    const minHist = Math.min(...gaps);
+    const curGap = Math.abs(currentPrices[i] - currentPrices[j]) / Math.max(currentPrices[i], currentPrices[j]);
+    return {
+      iName: names[i], jName: names[j],
+      minHistPct: +(minHist * 100).toFixed(1),
+      curGapPct: +(curGap * 100).toFixed(1),
+      hadOverlap: minHist <= 0.20,
+      gapExpanded: minHist <= 0.20 && curGap > 0.20,
+      cheaperName: currentPrices[i] <= currentPrices[j] ? names[i] : names[j],
+      cheaperPrice: +(Math.min(currentPrices[i], currentPrices[j])).toFixed(2),
+      priceDiff: +(Math.abs(currentPrices[i] - currentPrices[j])).toFixed(2)
+    };
+  }).filter(Boolean);
+  return { currentPrices, pairs: results };
+}
+
+// — 진행률 UI —
+let pcStartTime = null;
+function pcShowProgress(current, total, label) {
+  const bar = document.getElementById('pcProgressBar');
+  if (!bar) return;
+  bar.style.display = 'block';
+  const pct = total > 0 ? Math.round(current / total * 100) : 0;
+  document.getElementById('pcProgressFill').style.width = pct + '%';
+  document.getElementById('pcProgressPct').textContent = pct + '%';
+  document.getElementById('pcProgressLabel').textContent = label || '20년치 데이터 다운로드 중...';
+  let etaText = '';
+  if (pcStartTime && current > 5) {
+    const rate = current / ((Date.now() - pcStartTime) / 1000);
+    const rem = (total - current) / rate;
+    etaText = ` · 약 ${rem > 60 ? Math.round(rem / 60) + '분' : Math.round(rem) + '초'} 남음`;
+  }
+  document.getElementById('pcProgressDetail').textContent = `${current} / ${total}${etaText}`;
+}
+function pcHideProgress() { const b = document.getElementById('pcProgressBar'); if (b) b.style.display = 'none'; }
+
+// — 지역 드롭다운 채우기 —
+function pcPopulateRegions() {
+  const regs = JSON.parse(localStorage.getItem('cycleRegions') || '[]');
+  for (let i = 1; i <= 3; i++) {
+    const sel = document.getElementById(`pc_region${i}`);
+    if (!sel) continue;
+    const cur = sel.value;
+    while (sel.options.length > 1) sel.remove(1);
+    regs.forEach(r => {
+      const opt = document.createElement('option');
+      opt.value = r.code; opt.textContent = `${r.name} (${r.code})`;
+      sel.appendChild(opt);
+    });
+    if (cur) { for (const opt of sel.options) { if (opt.value === cur) { sel.value = cur; break; } } }
+  }
+}
+
+// — Chart.js 겹침 구간 플러그인 —
+const pcOverlapPlugin = {
+  id: 'pcOverlapZones',
+  beforeDraw(chart) {
+    const zones = chart.options.plugins && chart.options.plugins.pcOverlapZones && chart.options.plugins.pcOverlapZones.zones;
+    if (!zones || !zones.length) return;
+    const { ctx, chartArea, scales } = chart;
+    if (!chartArea || !scales.x) return;
+    ctx.save();
+    zones.forEach((zone, zi) => {
+      const x1 = scales.x.getPixelForValue(zone.startIdx);
+      const x2 = scales.x.getPixelForValue(zone.endIdx);
+      ctx.fillStyle = 'rgba(214,158,46,0.10)';
+      ctx.fillRect(x1, chartArea.top, x2 - x1, chartArea.bottom - chartArea.top);
+      ctx.strokeStyle = 'rgba(214,158,46,0.45)';
+      ctx.lineWidth = 1; ctx.setLineDash([4, 4]);
+      [x1, x2].forEach(x => { ctx.beginPath(); ctx.moveTo(x, chartArea.top); ctx.lineTo(x, chartArea.bottom); ctx.stroke(); });
+      ctx.setLineDash([]);
+      ctx.fillStyle = '#b7791f'; ctx.font = 'bold 10px Malgun Gothic,sans-serif';
+      ctx.fillText(`겹침${zi + 1}`, x1 + 4, chartArea.top + 14);
+    });
+    ctx.restore();
+  }
+};
+
+// — 차트 렌더링 —
+let pcChart = null;
+function pcRenderChart(months, sA, sB, sC, names, overlaps) {
+  document.getElementById('pcChartArea').style.display = 'block';
+  try { Chart.register(pcOverlapPlugin); } catch(e) {}
+  const ctx = document.getElementById('pcCompareChart').getContext('2d');
+  if (pcChart) { pcChart.destroy(); pcChart = null; }
+
+  const labels = months.map(m => m.substring(4, 6) === '01' ? m.substring(0, 4) + '년' : '');
+  const colors = ['#e53e3e', '#3182ce', '#38a169'];
+  const seriesMap = { sA, sB, sC };
+  const datasets = [sA, sB, sC].map((s, idx) => {
+    if (!names[idx] || !Object.keys(s).length) return null;
+    return {
+      label: names[idx],
+      _seriesIdx: idx,
+      data: months.map(m => (s[m] ? s[m].avg : null)),
+      borderColor: colors[idx],
+      backgroundColor: colors[idx] + '12',
+      tension: 0.3, borderWidth: 2.5,
+      pointRadius: months.map(m => (s[m] && !s[m].interp) ? 2 : 0),
+      pointHoverRadius: 6, spanGaps: true
+    };
+  }).filter(Boolean);
+
+  pcChart = new Chart(ctx, {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { position: 'top', labels: { font: { size: 13 }, usePointStyle: true } },
+        tooltip: {
+          callbacks: {
+            title: items => {
+              const m = months[items[0].dataIndex];
+              return m.substring(0, 4) + '년 ' + parseInt(m.substring(4, 6)) + '월';
+            },
+            label: c => {
+              const allS = [sA, sB, sC];
+              const m = months[c.dataIndex];
+              const origIdx = c.dataset._seriesIdx;
+              const s = (origIdx !== undefined) ? allS[origIdx] : null;
+              if (!s || !s[m]) return `${c.dataset.label}: 데이터 없음`;
+              return `${c.dataset.label}: ${c.raw}억${s[m].interp ? ' (보간)' : ` (${s[m].count}건)`}`;
+            }
+          }
+        },
+        pcOverlapZones: { zones: overlaps }
+      },
+      scales: {
+        x: { ticks: { maxRotation: 0, callback: (v, idx) => labels[idx] || null, font: { size: 11 } }, grid: { display: false } },
+        y: { title: { display: true, text: '거래가 (억 원)' }, ticks: { callback: v => v + '억', font: { size: 11 } } }
+      }
+    }
+  });
+}
+
+// — 결과 렌더링 —
+function pcRenderResult(months, sA, sB, sC, names, overlaps, undervalued, skipped) {
+  const colors = ['#e53e3e', '#3182ce', '#38a169'];
+  const series = [sA, sB, sC];
+  const now = new Date();
+
+  function getRecentPrice(s) {
+    for (let i = months.length - 1; i >= 0; i--) { const v = s[months[i]]; if (v && v.count > 0) return v.avg; }
+    for (let i = months.length - 1; i >= 0; i--) { const v = s[months[i]]; if (v && v.avg > 0) return v.avg; }
+    return null;
+  }
+  function getPastYm(yr) {
+    const d = new Date(now.getFullYear() - yr, now.getMonth(), 1);
+    return d.getFullYear().toString() + String(d.getMonth() + 1).padStart(2, '0');
+  }
+  function rateStr(cur, past) {
+    if (!cur || !past) return '데이터 없음';
+    return ((cur - past) / past * 100).toFixed(1).replace(/^([^-])/, '+$1') + '%';
+  }
+
+  const statsHTML = series.map((s, idx) => {
+    if (!names[idx] || !Object.keys(s).length) return '';
+    const cur = getRecentPrice(s);
+    const getP = yr => { const ym = getPastYm(yr); return s[ym] ? s[ym].avg : null; };
+    return `<div class="result-item" style="border-top:3px solid ${colors[idx]};">
+      <div class="label" style="color:${colors[idx]};font-weight:700;">${names[idx]}</div>
+      <div class="value" style="color:${colors[idx]};">${cur ? cur + '억' : '—'}</div>
+      <div style="font-size:11px;color:#718096;margin-top:4px;line-height:1.8;">
+        5년 수익률: ${rateStr(cur, getP(5))}<br>
+        10년 수익률: ${rateStr(cur, getP(10))}<br>
+        20년 수익률: ${rateStr(cur, getP(20) || (s[months[0]] ? s[months[0]].avg : null))}
+      </div>
+    </div>`;
+  }).join('');
+
+  let overlapHTML = '';
+  if (overlaps.length) {
+    const zoneList = overlaps.map((z, i) => {
+      const sm = months[z.startIdx], em = months[z.endIdx];
+      return `<span style="background:#fef3c7;padding:2px 8px;border-radius:4px;font-size:12px;margin:2px;">겹침${i+1}: ${sm.slice(0,4)}년${parseInt(sm.slice(4,6))}월~${em.slice(0,4)}년${parseInt(em.slice(4,6))}월</span>`;
+    }).join('');
+    overlapHTML = `<div class="insight-box" style="margin-top:16px;">
+      <strong>🔍 과거 가격 겹침 구간 발견!</strong> (그래프 노란 음영 = 갈아타기 기회였던 구간)<br>
+      ${zoneList}<br><br>
+      <span style="color:#22543d;">PDF 핵심: "과거에 가격이 겹쳤다 = 현재 격차가 다시 좁혀질 가능성이 있다는 증거입니다. 겹치는 구간에서 상급지로 갈아탔다면 이후 격차 벌어지기 수혜를 받았습니다."</span>
+    </div>`;
+  } else {
+    overlapHTML = `<div class="warning-box" style="margin-top:16px;"><strong>📊 겹침 구간 없음:</strong> 분석 기간 동안 세 단지 가격이 크게 겹치지 않았습니다. 입지 위계가 항상 가격에 반영된 단지들일 수 있습니다.</div>`;
+  }
+
+  let undervalHTML = '';
+  if (undervalued && undervalued.pairs.length) {
+    const expanded = undervalued.pairs.filter(p => p.gapExpanded).sort((a, b) => (b.curGapPct - b.minHistPct) - (a.curGapPct - a.minHistPct));
+    if (expanded.length) {
+      const top = expanded[0];
+      undervalHTML = `<div class="insight-box" style="margin-top:12px;border-left-color:#38a169;">
+        <strong>🎯 저평가 단지 추천: ${top.cheaperName}</strong><br><br>
+        <strong>${top.iName}</strong>과 <strong>${top.jName}</strong>의 가격 격차는 과거 최소 <strong>${top.minHistPct}%</strong>까지 좁혀진 적 있습니다.<br>
+        현재는 <strong>${top.curGapPct}%</strong> 격차 (${top.priceDiff}억 차이)로 벌어진 상태입니다.<br><br>
+        → <strong style="color:#22543d;">${top.cheaperName} (현재 ${top.cheaperPrice}억)</strong>이 역사적으로 저평가 상태입니다.
+      </div>`;
+    } else {
+      const pairDescs = undervalued.pairs.map(p => `${p.iName}↔${p.jName}: 현재 ${p.curGapPct}% 격차 (역대 최소 ${p.minHistPct}%)`).join('<br>');
+      undervalHTML = `<div class="insight-box" style="margin-top:12px;">
+        <strong>📊 가격 격차 현황:</strong><br>${pairDescs}<br><br>
+        과거에 겹친 적 없는 단지들입니다. 입지 위계 차이가 명확합니다.
+      </div>`;
+    }
+  }
+
+  const skipHTML = skipped ? `<div class="warning-box" style="margin-top:12px;">⚠️ ${skipped}개 월 데이터 수집 실패 (API 오류). 해당 구간은 보간 처리됩니다.</div>` : '';
+
+  document.getElementById('pcResult').innerHTML = `
+    <div class="result-box" style="margin-top:20px;">
+      <h3>📊 분석 결과 — ${names.filter(Boolean).join(' vs ')}</h3>
+      <div class="result-grid">${statsHTML}</div>
+      ${overlapHTML}${undervalHTML}${skipHTML}
+      <div class="insight-box" style="margin-top:16px;">
+        <strong>💡 PDF 핵심 메시지:</strong>
+        "현재는 큰 격차. 과거엔 겹쳐 있었다. 이 격차가 다시 좁혀질 가능성을 찾는 것이 저평가 분석이다."<br>
+        "문이 열릴 때 갈아타라 — 평수를 줄이더라도 상급지로. 집은 용기로 사는 것이다."
+      </div>
+    </div>`;
+}
+
+// — 메인 분석 함수 —
+async function pcStartAnalysis() {
+  const apiKey = (document.getElementById('apiKey').value || localStorage.getItem('apiKey') || '').trim();
+  if (!apiKey) {
+    alert('"API 설정" 탭에서 공공데이터 API 키를 먼저 등록해주세요.');
+    document.querySelector('[data-tab="api"]').click();
+    return;
+  }
+  const units = [1, 2, 3].map(i => ({
+    code: document.getElementById(`pc_region${i}`).value,
+    keyword: document.getElementById(`pc_keyword${i}`).value.trim(),
+    area: parseFloat(document.getElementById(`pc_area${i}`).value) || 0,
+    name: document.getElementById(`pc_keyword${i}`).value.trim()
+  }));
+  const active = units.filter(u => u.code && u.keyword);
+  if (active.length < 2) { alert('최소 2개 단지의 지역과 단지명 키워드를 입력해주세요.'); return; }
+
+  pcAborted = false;
+  document.getElementById('pcStartBtn').disabled = true;
+  document.getElementById('pcResult').innerHTML = '';
+  document.getElementById('pcChartArea').style.display = 'none';
+
+  const months = pcGetAllMonths();
+  const uniqueCodes = [...new Set(units.filter(u => u.code && u.keyword).map(u => u.code))];
+  const total = uniqueCodes.length * months.length;
+  let completed = 0, skipped = 0;
+  pcStartTime = Date.now();
+
+  // 지역별 월별 데이터 수집 (중복 코드 1회만 호출)
+  const codeDealsMap = {};
+  for (const code of uniqueCodes) {
+    codeDealsMap[code] = {};
+    for (const ym of months) {
+      if (pcAborted) break;
+      const unitName = units.find(u => u.code === code)?.keyword || code;
+      pcShowProgress(completed, total, `[${unitName}] ${ym.slice(0,4)}년 ${parseInt(ym.slice(4,6))}월 수집 중...`);
+      try {
+        codeDealsMap[code][ym] = await pcFetchMonth(apiKey, code, ym);
+        await pcDelay(200);
+      } catch (e) {
+        console.warn(`[${code}] ${ym} 실패:`, e);
+        codeDealsMap[code][ym] = [];
+        skipped++;
+        await pcDelay(500);
+      }
+      completed++;
+    }
+    if (pcAborted) break;
+  }
+
+  document.getElementById('pcStartBtn').disabled = false;
+  pcHideProgress();
+
+  if (pcAborted) {
+    document.getElementById('pcResult').innerHTML = `<div class="warning-box" style="margin-top:16px;">⏹ 분석 중단. 수집된 데이터는 IndexedDB에 저장되어 다음 실행 시 재사용됩니다.</div>`;
+    return;
+  }
+
+  // 단지별 시계열 계산
+  const allSeries = units.map(u => {
+    if (!u.code || !u.keyword) return {};
+    const raw = {};
+    months.forEach(ym => {
+      const deals = codeDealsMap[u.code]?.[ym] || [];
+      const filtered = pcFilterDeals(deals, u.keyword, u.area);
+      const avg = pcCalcAvg(filtered);
+      if (avg) raw[ym] = avg;
+    });
+    return pcInterpolate(raw, months);
+  });
+
+  const names = units.map(u => u.name);
+  const [sA, sB, sC] = allSeries;
+  const overlaps = pcFindOverlaps(sA, sB, sC, months);
+  const undervalued = pcFindUndervalued(sA, sB, sC, names, months);
+
+  pcRenderChart(months, sA, sB, sC, names, overlaps);
+  pcRenderResult(months, sA, sB, sC, names, overlaps, undervalued, skipped);
+}
+
+function pcAbort() { pcAborted = true; }
+
+// — 예시 불러오기 —
+const PC_EXAMPLES = {
+  seonsa: { units: [
+    { code: '11740', name: '강동구', keyword: '선사현대', area: '' },
+    { code: '11170', name: '구로구', keyword: '신도림대림', area: '' },
+    { code: '11230', name: '동대문구', keyword: '답십리두산', area: '' }
+  ]},
+  bundang: { units: [
+    { code: '41135', name: '성남 분당구', keyword: '시범한양', area: '33' },
+    { code: '41465', name: '용인 수지구', keyword: '풍덕천현대', area: '33' },
+    { code: '41590', name: '화성시', keyword: '병점', area: '' }
+  ]}
+};
+
+function pcLoadExample(type) {
+  const ex = PC_EXAMPLES[type];
+  if (!ex) return;
+  ex.units.forEach((unit, i) => {
+    const sel = document.getElementById(`pc_region${i+1}`);
+    const kwd = document.getElementById(`pc_keyword${i+1}`);
+    const ar = document.getElementById(`pc_area${i+1}`);
+    if (!sel || !kwd || !ar) return;
+    let found = false;
+    for (const opt of sel.options) { if (opt.value === unit.code) { found = true; break; } }
+    if (!found) {
+      const opt = document.createElement('option');
+      opt.value = unit.code; opt.textContent = `${unit.name} (${unit.code})`; opt.dataset.temp = '1';
+      sel.appendChild(opt);
+    }
+    sel.value = unit.code;
+    kwd.value = unit.keyword;
+    ar.value = unit.area || '';
+  });
+}
+
+function pcClear() {
+  for (let i = 1; i <= 3; i++) {
+    const sel = document.getElementById(`pc_region${i}`);
+    if (sel) { sel.value = ''; Array.from(sel.options).filter(o => o.dataset.temp).forEach(o => sel.removeChild(o)); }
+    const kwd = document.getElementById(`pc_keyword${i}`); if (kwd) kwd.value = '';
+    const ar = document.getElementById(`pc_area${i}`); if (ar) ar.value = '';
+  }
+  document.getElementById('pcResult').innerHTML = '';
+  document.getElementById('pcChartArea').style.display = 'none';
+  pcHideProgress();
+}
+
+document.querySelector('[data-tab="compare"]').addEventListener('click', pcPopulateRegions);
+initPcDB().catch(e => console.warn('IndexedDB 초기화 실패 (캐시 비활성):', e));
+
+// ============ 갭투자 계산기 ============
+function calculateGap() {
+  const price = parseFloat(document.getElementById('gapPrice').value) || 0;
+  const jeonse = parseFloat(document.getElementById('gapJeonse').value) || 0;
+  const tax = parseFloat(document.getElementById('gapTax').value) / 10000 || 0; // 만원->억
+  const rise = parseFloat(document.getElementById('gapRise').value) || 0;
+  const jeonseChange = parseFloat(document.getElementById('gapJeonseChange').value) || 0;
+  const years = parseFloat(document.getElementById('gapYears').value) || 1;
+
+  if (price <= 0 || jeonse <= 0) {
+    alert('매매가와 전세가를 입력해주세요.');
+    return;
+  }
+  if (jeonse >= price) {
+    alert('전세가는 매매가보다 작아야 합니다.');
+    return;
+  }
+
+  // 핵심 계산
+  const initialCapital = price - jeonse + tax; // 실투자금
+  const jeonseRatio = (jeonse / price * 100).toFixed(1);
+
+  const futurePrice = price * (1 + rise/100);
+  const futureJeonse = jeonse * (1 + jeonseChange/100);
+
+  const gain = futurePrice - price; // 시세차익 (억)
+  const roi = (gain / initialCapital * 100).toFixed(1); // 수익률
+
+  // 역전세 시뮬레이션
+  const jeonseGap = jeonse - futureJeonse; // 양수면 역전세 (추가 자금 필요)
+
+  // 안전마진 평가
+  let safetyGrade, safetyColor, safetyMsg;
+  if (jeonseGap <= 0) {
+    safetyGrade = '✅ 안전';
+    safetyColor = 'positive';
+    safetyMsg = '전세가가 유지되거나 상승하여 역전세 리스크가 없습니다. 오히려 전세금 상승분으로 추가 투자 자금 확보 가능!';
+  } else if (jeonseGap < initialCapital * 0.5) {
+    safetyGrade = '⚠️ 주의';
+    safetyColor = 'warning';
+    safetyMsg = `역전세 ${(jeonseGap*10000).toFixed(0)}만원 발생 예상. 보유한 여유자금으로 메꿀 수 있는지 확인하세요.`;
+  } else {
+    safetyGrade = '🚨 위험';
+    safetyColor = 'negative';
+    safetyMsg = `역전세 ${(jeonseGap*10000).toFixed(0)}만원! 초기 투자금의 절반 이상이 필요합니다. PDF 경고처럼 "버틸 수 있는지" 신중히 판단하세요.`;
+  }
+
+  document.getElementById('gapResult').innerHTML = `
+    <div class="result-box">
+      <h3>💰 갭투자 시뮬레이션 결과</h3>
+      <div class="result-grid">
+        <div class="result-item">
+          <div class="label">실투자금</div>
+          <div class="value">${initialCapital.toFixed(2)}억</div>
+          <div style="font-size:11px;color:#718096;margin-top:4px;">매매가 - 전세금 + 세금</div>
+        </div>
+        <div class="result-item">
+          <div class="label">전세가율</div>
+          <div class="value">${jeonseRatio}%</div>
+          <div style="font-size:11px;color:#718096;margin-top:4px;">${jeonseRatio >= 70 ? '갭투자 적합' : '갭이 큼'}</div>
+        </div>
+        <div class="result-item">
+          <div class="label">${years}년 후 시세차익</div>
+          <div class="value ${gain >= 0 ? 'positive' : 'negative'}">${gain >= 0 ? '+' : ''}${gain.toFixed(2)}억</div>
+        </div>
+        <div class="result-item">
+          <div class="label">투자수익률 (ROI)</div>
+          <div class="value ${roi >= 0 ? 'positive' : 'negative'}">${roi >= 0 ? '+' : ''}${roi}%</div>
+          <div style="font-size:11px;color:#718096;margin-top:4px;">레버리지 효과 포함</div>
+        </div>
+        <div class="result-item">
+          <div class="label">역전세 위험도</div>
+          <div class="value ${safetyColor}" style="font-size:18px;">${safetyGrade}</div>
+        </div>
+        <div class="result-item">
+          <div class="label">${years}년 후 전세금</div>
+          <div class="value">${futureJeonse.toFixed(2)}억</div>
+          <div style="font-size:11px;color:#718096;margin-top:4px;">${jeonseChange >= 0 ? '+' : ''}${jeonseChange}% 변동</div>
+        </div>
+      </div>
+
+      <div class="${jeonseGap > 0 ? 'warning-box' : 'insight-box'}">
+        <strong>📌 안전마진 진단:</strong> ${safetyMsg}
+      </div>
+
+      <div class="insight-box" style="margin-top:12px;">
+        <strong>💡 PDF 인사이트:</strong>
+        "갭투자는 양날의 검 — 수익이 큰 만큼 손실도 큽니다.
+        매매가 하락보다 <strong>전세가 하락(역전세)이 더 무섭다</strong>는 것이 핵심입니다.
+        매도하지 않으면 매매 하락은 명목 손실이지만, 역전세는 실제 현금이 나가야 합니다."
+      </div>
+    </div>
+  `;
+}
+
+// ============ 입지 평가 ============
+const locationScores = { S: 4, A: 3, B: 2, C: 1 };
+const selected = {};
+
+document.querySelectorAll('.grade-buttons').forEach(group => {
+  group.querySelectorAll('.grade-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      group.querySelectorAll('.grade-btn').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      selected[group.dataset.category] = btn.dataset.grade;
+    });
+  });
+});
+
+function evaluateLocation() {
+  const categories = ['job', 'transport', 'school', 'env', 'supply'];
+  const names = {job:'직장', transport:'교통', school:'학군', env:'환경', supply:'공급'};
+
+  if (categories.some(c => !selected[c])) {
+    alert('모든 항목을 평가해주세요.');
+    return;
+  }
+
+  const grades = categories.map(c => selected[c]);
+  const totalScore = grades.reduce((s,g) => s + locationScores[g], 0);
+  const maxScore = 20;
+  const percent = (totalScore / maxScore * 100).toFixed(0);
+
+  let overallGrade, gradeColor, comment;
+  if (totalScore >= 18) {
+    overallGrade = 'S급지'; gradeColor = '#d69e2e';
+    comment = '🏆 최상급 입지! 강남급 핵심지로 분류됩니다. PDF의 "비싼 아파트가 먼저 오르고 많이 오른다" 원리에 따라 상승 사이클의 선두주자가 될 것입니다.';
+  } else if (totalScore >= 14) {
+    overallGrade = 'A급지'; gradeColor = '#38a169';
+    comment = '✨ 상급 입지입니다. S급지가 오른 후 가장 빠르게 따라 오르는 위치입니다. 갭벌리기에서 다음 차례로 상승할 가능성이 큽니다.';
+  } else if (totalScore >= 10) {
+    overallGrade = 'B급지'; gradeColor = '#3182ce';
+    comment = '📊 중급 입지입니다. 갭메우기 단계에서 상승할 수 있지만, 사이클 후반부에 따라옵니다. 안전마진 확보가 중요합니다.';
+  } else {
+    overallGrade = 'C급지'; gradeColor = '#718096';
+    comment = '⚠️ 하급 입지입니다. PDF 경고: "아무리 좋은 아파트도 힘든 구간은 있다"는 점, 그리고 80~90%는 그 구간을 못 버틴다는 점을 기억하세요. 더 좋은 입지로 갈아타기를 고려해보세요.';
+  }
+
+  const detailHTML = categories.map((c,i) => {
+    const g = grades[i];
+    const colors = {S:'#d69e2e', A:'#38a169', B:'#3182ce', C:'#718096'};
+    return `
+      <div class="result-item">
+        <div class="label">${names[c]}</div>
+        <div class="value" style="color:${colors[g]};font-size:24px;">${g}</div>
+      </div>
+    `;
+  }).join('');
+
+  document.getElementById('locationResult').innerHTML = `
+    <div class="result-box">
+      <h3>📍 종합 입지 평가 결과</h3>
+      <div style="text-align:center;padding:20px;background:white;border-radius:10px;margin:16px 0;">
+        <div style="font-size:14px;color:#718096;">종합 등급</div>
+        <div style="font-size:48px;font-weight:800;color:${gradeColor};margin:8px 0;">${overallGrade}</div>
+        <div style="font-size:16px;color:#1a365d;">${totalScore} / ${maxScore} 점 (${percent}%)</div>
+      </div>
+
+      <div class="result-grid">${detailHTML}</div>
+
+      <div class="insight-box">
+        <strong>📌 종합 코멘트:</strong> ${comment}
+      </div>
+
+      <div class="insight-box" style="margin-top:12px;">
+        <strong>💡 PDF 인사이트:</strong>
+        "입지를 평가할 때 분절적으로 접근하지 말고, '살기 좋다'라는 총체적 느낌으로 접근하세요.
+        결국 입지는 가격과 연결지어 생각해야 합니다 —
+        <strong>이 입지에 이 가격이면 싼가, 비싼가?</strong>"
+      </div>
+    </div>
+  `;
+}
+
+// ============ 학습 카드 ============
+const learningCards = [
+  {
+    emoji: '🏛️',
+    title: '급지론 (위계)',
+    back: '<strong>핵심:</strong> 부동산은 S/A/B/C 급지로 위계가 명확하며, 이 위계는 쉽게 넘볼 수 없다.<br><br><strong>예시:</strong> 분당 > 수지 > 화성 — 평균 매매가격이 항상 위계 순으로 정렬됨.<br><br><strong>적용:</strong> 같은 가격이면 더 상위 급지를 선택하라.'
+  },
+  {
+    emoji: '🔄',
+    title: '갭벌리기 / 갭메우기',
+    back: '<strong>갭벌리기:</strong> 상승장에서 A급지가 먼저, 많이 오르면서 격차가 벌어진다.<br><br><strong>갭메우기:</strong> 후속으로 B, C급지가 따라 오르며 격차를 좁힌다.<br><br><strong>적용:</strong> A급지 상승을 보고 B, C급지 진입 타이밍을 잡는다.'
+  },
+  {
+    emoji: '🍯',
+    title: '가격평가 피라미드',
+    back: '<strong>5단계 구조:</strong><br>1. 시장상황 (상승/하락)<br>2. 지역위계 (급지)<br>3. 입지요소 (일자리/교통/학군/상권/환경)<br>4. 상품 (연식/세대수/브랜드)<br>5. 가격 (모든 변수의 총합)<br><br>아래로 갈수록 영향 범위가 넓다.'
+  },
+  {
+    emoji: '📈',
+    title: '벌집순환모형',
+    back: '<strong>6국면 사이클:</strong><br>회복진입 → 회복 → 호황 → 침체진입 → 침체 → 불황 → 다시 회복<br><br><strong>국면별:</strong> 거래량과 가격의 변화로 판단.<br><br><strong>적용:</strong> "지금 사이클의 어디인가?"를 먼저 묻고 매수/매도를 결정하라.'
+  },
+  {
+    emoji: '⚖️',
+    title: '입지-가격 연결 로직',
+    back: '<strong>경고:</strong> "입지 좋다"는 말만 믿고 사면 위험!<br><br><strong>올바른 사고:</strong><br>"이 입지에 이 가격이면 싼가, 비싼가?"<br>"그 입지면 얼마를 받는 게 적정한가?"<br><br>입지는 반드시 가격과 연결지어 평가해야 한다.'
+  },
+  {
+    emoji: '🎯',
+    title: '저평가의 정의',
+    back: '<strong>두 가지 접근:</strong><br>① 똑같은 입지의 단지 3개 → 가장 싼 것 고르기<br>② 똑같은 가격의 단지 3개 → 가장 좋은 입지 고르기<br><br><strong>핵심:</strong> 가격평가는 비교군이 있어야 가능하다. 단독으로 "싸다"는 판단은 위험하다.'
+  },
+  {
+    emoji: '⚠️',
+    title: '갭투자 양날의 검',
+    back: '<strong>장점:</strong> 적은 자본으로 큰 수익 (레버리지)<br><strong>단점:</strong> 손실도 크다, 특히 역전세 리스크<br><br><strong>핵심:</strong> 매매가 하락보다 <strong>전세가 하락이 더 무섭다.</strong> 매도 안 하면 매매 하락은 명목손실, 역전세는 실제 현금 지출!'
+  },
+  {
+    emoji: '🪜',
+    title: '한 계단씩 오르기',
+    back: '<strong>부동산 시장의 법칙:</strong> 비싼 아파트가 먼저, 많이 오른다.<br><br><strong>전략:</strong><br>→ 내가 살 수 있는 것 중<br>→ 가장 좋은 입지에서<br>→ 가장 저평가된 것을 골라<br>→ 안전마진을 확보해 쌓아가기'
+  },
+  {
+    emoji: '⏳',
+    title: '10년 버티기',
+    back: '<strong>현실:</strong> 좋은 아파트도 힘든 구간은 반드시 있다.<br><br><strong>통계:</strong> 80~90%는 이 기간을 못 버티고 매도한다.<br><br><strong>교훈:</strong> "갖고만 있어도 수익"의 진실은 "버틸 수 있는 사람만"이라는 것. 자금 계획이 먼저!'
+  },
+  {
+    emoji: '🚪',
+    title: '문이 열릴 때 갈아타라',
+    back: '<strong>PDF 메시지:</strong><br>"평수를 줄이더라도 상급지로 가라"<br><br><strong>이유:</strong> 본격 상승장을 통해 급지간 가격이 분화될 때, 하위 급지에서 상위 급지로의 갈아타기 기회는 점점 좁아진다. 가격이 겹치는 구간이 곧 기회!'
+  },
+  {
+    emoji: '💭',
+    title: '집은 용기로 사는 것',
+    back: '<strong>핵심 메시지:</strong> 늘 우리는 좋은 시점, 좋은 가격에 사고 싶지만 그 시기는 아무도 모른다. 지나봐야 안다.<br><br><strong>"집은 돈으로 사는 것이 아니라 용기로 사는 것이다."</strong><br><br>단, 용기는 무모함이 아닌 "잘 알고 있는 만큼의" 용기여야 한다.'
+  },  {
+    emoji: '😱',
+    title: '벼락거지 심리',
+    back: '<strong>현상:</strong> 자산 가격은 급등하는데 소득은 그대로 → 상대적 빈곤감<br><br><strong>위험:</strong> 초조함과 불안감 때문에 짧은 시계열로 판단하게 됨 → 떠밀려 진입하면 고점 매수 위험!<br><br><strong>대응:</strong> 장기 우상향을 믿고, 사이클을 보며 차분히.'
+  }
+];
+
+const cardsContainer = document.getElementById('cardsContainer');
+learningCards.forEach(card => {
+  const div = document.createElement('div');
+  div.className = 'flip-card';
+  div.innerHTML = `
+    <div class="flip-card-inner">
+      <div class="flip-card-front">
+        <div class="card-emoji">${card.emoji}</div>
+        <h4>${card.title}</h4>
+        <div class="hint">클릭하여 자세히 보기</div>
+      </div>
+      <div class="flip-card-back">${card.back}</div>
+    </div>
+  `;
+  div.addEventListener('click', () => div.classList.toggle('flipped'));
+  cardsContainer.appendChild(div);
+});
+
+// ============ QR 키 전송 ============
+function showKeyTransferQR() {
+  const key = (document.getElementById('apiKey').value || localStorage.getItem('apiKey') || '').trim();
+  if (!key) {
+    alert('먼저 API 키를 입력해주세요.');
+    document.getElementById('apiKey').focus();
+    return;
+  }
+  // 현재 페이지 URL에 ?key=... 파라미터 붙여서 QR로 인코딩
+  const base = window.location.origin + window.location.pathname;
+  const transferUrl = base + '?key=' + encodeURIComponent(key);
+
+  const box = document.getElementById('qrTransferBox');
+  const target = document.getElementById('qrCodeImage');
+  target.innerHTML = ''; // 기존 QR 제거
+
+  if (typeof QRCode === 'undefined') {
+    target.innerHTML = '<div style="color:#9b2c2c;">QR 라이브러리 로드 실패. 인터넷 연결을 확인해주세요.</div>';
+  } else {
+    new QRCode(target, {
+      text: transferUrl,
+      width: 220,
+      height: 220,
+      correctLevel: QRCode.CorrectLevel.M
+    });
+  }
+  box.style.display = 'block';
+  box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function hideKeyTransferQR() {
+  const box = document.getElementById('qrTransferBox');
+  box.style.display = 'none';
+  document.getElementById('qrCodeImage').innerHTML = '';
+}
+
+// 페이지 로드 시 URL ?key=... 파라미터 자동 처리
+(function autoImportKeyFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const incoming = params.get('key');
+  if (!incoming) return;
+
+  const trimmed = incoming.trim();
+  if (trimmed.length < 10) return; // 너무 짧으면 무시
+
+  try {
+    localStorage.setItem('apiKey', trimmed);
+    // 주소창에서 키 파라미터 제거 (히스토리/북마크에 키 남지 않도록)
+    const cleanUrl = window.location.origin + window.location.pathname;
+    window.history.replaceState({}, document.title, cleanUrl);
+
+    // 페이지 로드 후 사용자에게 알리고 API 탭으로 안내
+    window.addEventListener('load', () => {
+      const apiInput = document.getElementById('apiKey');
+      if (apiInput) apiInput.value = trimmed;
+      const tab = document.querySelector('[data-tab="api"]');
+      if (tab) tab.click();
+      setTimeout(() => alert('✅ API 키가 이 기기에 저장되었습니다. 바로 사용하실 수 있습니다.'), 300);
+    });
+  } catch (e) {
+    console.warn('키 자동 저장 실패:', e);
+  }
+})();
+
+// ============ API 테스트 ============
+function testAPI() {
+  const key = document.getElementById('apiKey').value.trim();
+  const lawd = document.getElementById('lawdCd').value.trim();
+  const ymd = document.getElementById('dealYmd').value.trim();
+  const resultDiv = document.getElementById('apiResult');
+  if (!key) {
+    resultDiv.innerHTML = `<div class="warning-box"><strong>⚠️</strong> API 키를 입력해주세요.</div>`;
+    return;
+  }
+  const url = `https://apis.data.go.kr/1613000/RTMSDataSvcAptTrade/getRTMSDataSvcAptTrade?serviceKey=${encodeURIComponent(key)}&LAWD_CD=${lawd}&DEAL_YMD=${ymd}`;
+  resultDiv.innerHTML = `
+    <div class="insight-box">
+      <strong>✅ API 키가 저장되었습니다!</strong><br><br>
+      이제 "사이클 진단" 탭으로 가서 관심 지역을 추가하고 진단을 시작하실 수 있습니다.<br><br>
+      <strong>호출 URL 예시:</strong><br>
+      <code style="font-size:11px;word-break:break-all;background:#f7fafc;padding:6px;display:block;margin-top:6px;border-radius:4px;">
+        ${url.substring(0, 150)}...
+      </code>
+    </div>
+  `;
+}
+
+// ============================================================
+// 🆕 사이클 진단 — 벌집순환모형 9국면 진단 시스템
+// ============================================================
+const PHASES = {
+  1: { name:'1차 투자자 진입', desc:'조용한 바닥에서 눈치 빠른 사람들이 움직이는 시기',
+       market:'거래량은 늘기 시작, 가격은 아직 보합', psych:'대중은 "부동산 망했다" 분위기, 1차 투자자만 조용히 매수',
+       buyer:'✅ 매수 최적기 — 안전마진 확보 가능, 단 입지 좋은 곳만 선별', holder:'보유 유지, 추가 매수 검토',
+       risk:1, signal:'🟢', color:'#38a169' },
+  2: { name:'저가매물 소진', desc:'급매가 사라지기 시작하는 시기',
+       market:'거래량 증가 지속, 가격 살짝 들썩', psych:'일부 매도자가 호가를 올리기 시작',
+       buyer:'✅ 매수 가능 — 단 급매 협상은 점점 어려워짐, 결단 필요', holder:'보유 유지',
+       risk:1, signal:'🟢', color:'#38a169' },
+  3: { name:'2차 투자자 진입', desc:'소문 듣고 들어오는 사람들이 늘어나는 시기',
+       market:'거래량 더 크게 증가, 가격 슬슬 상승', psych:'부동산 카페·유튜브에서 "지금 사야 한다" 글 늘어남',
+       buyer:'✅ 선별 매수 — 입지+저평가 동시 충족 단지만', holder:'보유 유지',
+       risk:2, signal:'🟢', color:'#38a169' },
+  4: { name:'가격 상승 초입', desc:'이제 누구나 오른다는 걸 아는 시기',
+       market:'거래량↑ 가격↑ 동반 상승', psych:'뉴스에 "○○동 신고가" 헤드라인 등장',
+       buyer:'⚠️ 신중 매수 — 안전마진 점점 줄어듦, 갭메우기 대상지 위주로', holder:'갈아타기 준비 (자금 점검)',
+       risk:3, signal:'🟡', color:'#d69e2e' },
+  5: { name:'본격적 상승 시작', desc:'전국이 들썩이기 시작 (= 마지막 사다리)',
+       market:'거래량 폭증, 가격 본격 급등', psych:'주변 사람들 "나도 샀다" 자랑, 안 산 사람은 초조함',
+       buyer:'🚪 갈아타기 매수 — 평수↓ 급지↑ (PDF 105쪽)', holder:'🚪 갈아타기 적기 — 상위 급지로 (문이 닫히기 전)',
+       risk:3, signal:'🟡', color:'#d69e2e' },
+  6: { name:'상승장 한 가운데', desc:'벼락거지라는 말이 나오는 시기',
+       market:'가격 천정부지, 거래량은 여전히 높음', psych:'"이거라도 사야 하나" 떠밀린 매수 폭증 (PDF 18쪽 그 개미)',
+       buyer:'🚨 매수 자제 — 추격 매수는 고점 위험', holder:'보유, 추격 매수 금지, 보유 단지 점검에 집중',
+       risk:5, signal:'🔴', color:'#e53e3e' },
+  7: { name:'고점 형성 후 피봇', desc:'거래가 끊기는데 호가만 높은 시기',
+       market:'거래량 급감, 가격은 고점 유지', psych:'매수자 사라짐, 매도자는 "내릴 수 없다" 버팀',
+       buyer:'🚨 관망 — 매수하면 꼭지 잡을 위험', holder:'매도 고민 시기 (꼭지 인식)',
+       risk:5, signal:'🔴', color:'#e53e3e' },
+  8: { name:'짙은 하락세', desc:'팔고 싶어도 안 팔리는 시기',
+       market:'거래량↓ 가격↓ 동반 하락', psych:'"갚즈아" 분위기, 영끌족 비명 (PDF 25쪽)',
+       buyer:'⚠️ 버티기 — 매수자는 아직 이름, 칼날 잡지 말 것', holder:'버티기 — 매도하면 손실 확정',
+       risk:4, signal:'🟠', color:'#dd6b20' },
+  9: { name:'하락장 속 바닥 다지기', desc:'더는 안 떨어지는 듯한 시기 (= 다시 1번으로)',
+       market:'거래량 늘기 시작, 가격은 바닥에서 보합', psych:'대중은 "부동산 끝났다", 1차 투자자는 다시 눈빛 반짝',
+       buyer:'✅ 매수 준비 — 자금 마련할 때', holder:'보유 유지, 다음 사이클 대비',
+       risk:2, signal:'🟢', color:'#38a169' }
+};
+
+function diagnosePhase(volChange, priceChange) {
+  const VOL_T = 10, PRICE_T = 1;
+  const v = volChange > VOL_T ? 1 : (volChange < -VOL_T ? -1 : 0);
+  const p = priceChange > PRICE_T ? 1 : (priceChange < -PRICE_T ? -1 : 0);
+  if (v === 1 && p === 0) return 1;
+  if (v === 1 && p === 1 && priceChange < 3) return 2;
+  if (v === 1 && p === 1 && priceChange >= 3 && priceChange < 6) return 3;
+  if (v === 1 && p === 1 && priceChange >= 6) return volChange >= 25 ? 5 : 4;
+  if (v === 0 && p === 1) return 6;
+  if (v === -1 && p === 0) return 7;
+  if (v === -1 && p === -1) return 8;
+  if ((v === 1 || v === 0) && p === -1) return 9;
+  return 1;
+}
+
+let regions = JSON.parse(localStorage.getItem('cycleRegions') || '[]');
+function saveRegions() { localStorage.setItem('cycleRegions', JSON.stringify(regions)); renderRegionList(); }
+function addRegion() {
+  const name = document.getElementById('newRegionName').value.trim();
+  const code = document.getElementById('newRegionCode').value.trim();
+  if (!name || !code) { alert('지역명과 지역코드를 모두 입력해주세요.'); return; }
+  if (!/^\d{5}$/.test(code)) { alert('지역코드는 5자리 숫자여야 합니다.'); return; }
+  if (regions.some(r => r.code === code)) { alert('이미 등록된 지역입니다.'); return; }
+  regions.push({ name, code });
+  document.getElementById('newRegionName').value = '';
+  document.getElementById('newRegionCode').value = '';
+  saveRegions();
+}
+function removeRegion(code) { regions = regions.filter(r => r.code !== code); saveRegions(); }
+function renderRegionList() {
+  const div = document.getElementById('regionList');
+  if (!div) return;
+  if (!regions.length) {
+    div.innerHTML = '<span style="color:#a0aec0;font-size:13px;">아직 등록된 지역이 없습니다. 위에서 추가하거나 "데모 지역 불러오기"를 눌러주세요.</span>';
+    return;
+  }
+  div.innerHTML = regions.map(r => `
+    <span style="background:#2c5282;color:white;padding:6px 12px;border-radius:20px;font-size:13px;display:inline-flex;align-items:center;gap:6px;">
+      ${r.name} (${r.code})
+      <button onclick="removeRegion('${r.code}')" style="background:rgba(255,255,255,0.3);border:none;color:white;width:18px;height:18px;border-radius:50%;cursor:pointer;font-size:11px;">×</button>
+    </span>
+  `).join('');
+}
+function loadDemoRegions() {
+  if (regions.length > 0 && !confirm('기존 지역 목록을 초기화하고 데모 지역을 불러올까요?')) return;
+  regions = [
+    { name: '서울 강남구', code: '11680' }, { name: '서울 서초구', code: '11650' },
+    { name: '서울 송파구', code: '11710' }, { name: '서울 강동구', code: '11740' },
+    { name: '서울 마포구', code: '11440' }, { name: '서울 성동구', code: '11200' },
+    { name: '서울 영등포구', code: '11560' }, { name: '성남 분당구', code: '41135' },
+    { name: '용인 수지구', code: '41465' }, { name: '대구 수성구', code: '27260' },
+    { name: '대구 중구', code: '27110' }, { name: '화성시', code: '41590' }
+  ];
+  saveRegions();
+}
+
+const API_BASE = 'https://apis.data.go.kr/1613000/RTMSDataSvcAptTrade/getRTMSDataSvcAptTrade';
+const CORS_PROXY = 'https://corsproxy.io/?';
+
+function getYearMonth(monthsAgo) {
+  const d = new Date();
+  d.setMonth(d.getMonth() - monthsAgo);
+  return d.getFullYear().toString() + String(d.getMonth() + 1).padStart(2, '0');
+}
+
+async function fetchMonthData(apiKey, lawdCd, dealYmd) {
+  const url = `${API_BASE}?serviceKey=${encodeURIComponent(apiKey)}&LAWD_CD=${lawdCd}&DEAL_YMD=${dealYmd}&numOfRows=1000&pageNo=1`;
+  try {
+    const res = await fetch(CORS_PROXY + encodeURIComponent(url));
+    const xml = await res.text();
+    const doc = new DOMParser().parseFromString(xml, 'text/xml');
+    const items = doc.getElementsByTagName('item');
+    let total = 0, count = 0;
+    for (let i = 0; i < items.length; i++) {
+      const node = items[i].getElementsByTagName('dealAmount')[0] || items[i].getElementsByTagName('거래금액')[0];
+      if (!node) continue;
+      const amt = parseFloat(node.textContent.replace(/[^0-9]/g, ''));
+      if (!isNaN(amt) && amt > 0) { total += amt; count++; }
+    }
+    return { count, avgPrice: count > 0 ? total / count : 0 };
+  } catch (e) { console.error('API 호출 실패:', e); return null; }
+}
+
+async function diagnoseRegion(apiKey, region) {
+  const recent = [1, 2, 3], prior = [4, 5, 6];
+  const rR = await Promise.all(recent.map(m => fetchMonthData(apiKey, region.code, getYearMonth(m))));
+  const pR = await Promise.all(prior.map(m => fetchMonthData(apiKey, region.code, getYearMonth(m))));
+  if (rR.some(r => r === null) || pR.some(r => r === null)) return { region, error:'API 호출 실패 (키 확인 또는 잠시 후 재시도)' };
+  const rC = rR.reduce((s,r) => s + r.count, 0);
+  const pC = pR.reduce((s,r) => s + r.count, 0);
+  const rA = rR.reduce((s,r) => s + r.avgPrice * r.count, 0) / Math.max(1, rC);
+  const pA = pR.reduce((s,r) => s + r.avgPrice * r.count, 0) / Math.max(1, pC);
+  if (pC === 0 || pA === 0) return { region, error:'직전 3개월 거래 데이터 부족' };
+  const volChange = ((rC - pC) / pC * 100);
+  const priceChange = ((rA - pA) / pA * 100);
+  return { region, volChange:+volChange.toFixed(1), priceChange:+priceChange.toFixed(2),
+           recentCount:rC, priorCount:pC, phase: diagnosePhase(volChange, priceChange) };
+}
+
+let cycleChart = null;
+
+async function diagnoseAll() {
+  const apiKey = (document.getElementById('apiKey').value || localStorage.getItem('apiKey') || '').trim();
+  if (!apiKey) {
+    alert('"API 설정" 탭에서 공공데이터 API 키를 먼저 등록해주세요.');
+    document.querySelector('[data-tab="api"]').click();
+    return;
+  }
+  localStorage.setItem('apiKey', apiKey);
+  if (!regions.length) { alert('관심 지역을 1개 이상 추가해주세요.'); return; }
+  const resultDiv = document.getElementById('cycleResult');
+  resultDiv.innerHTML = `<div class="info-banner">⏳ ${regions.length}개 지역 진단 중... (CORS 프록시 경유, 잠시만 기다려주세요)</div>`;
+  const results = [];
+  for (const region of regions) {
+    const r = await diagnoseRegion(apiKey, region);
+    results.push(r);
+    resultDiv.innerHTML = `<div class="info-banner">⏳ ${results.length}/${regions.length} 진단 중... 현재: ${region.name}</div>`;
+  }
+  renderCycleResult(results);
+}
+
+function renderCycleResult(results) {
+  const valid = results.filter(r => !r.error);
+  const errors = results.filter(r => r.error);
+  valid.sort((a,b) => PHASES[a.phase].risk - PHASES[b.phase].risk);
+  let html = `<div class="result-box"><h3>📊 전체 지역 사이클 진단 결과</h3>`;
+  if (valid.length >= 2) {
+    const phases = valid.map(r => r.phase);
+    const minP = Math.min(...phases), maxP = Math.max(...phases);
+    if (maxP - minP >= 3) {
+      const leaders = valid.filter(r => r.phase === maxP).map(r => r.region.name);
+      const followers = valid.filter(r => r.phase === minP).map(r => r.region.name);
+      html += `<div class="insight-box">
+        <strong>🎯 갭벌리기 포착!</strong><br>
+        선행 지역(${leaders.join(', ')})은 ${maxP}번 국면, 후행 지역(${followers.join(', ')})은 ${minP}번 국면입니다.
+        PDF 원리에 따라 선행 지역의 상승이 후행 지역으로 전이될 가능성이 있습니다 (갭메우기 기회).
+      </div>`;
+    }
+  }
+  html += `<div style="overflow-x:auto;margin-top:16px;"><table style="width:100%;border-collapse:collapse;background:white;border-radius:8px;overflow:hidden;font-size:13px;">
+    <thead><tr style="background:#1a365d;color:white;">
+      <th style="padding:12px;text-align:left;">지역</th>
+      <th style="padding:12px;">거래량 변화</th>
+      <th style="padding:12px;">가격 변화</th>
+      <th style="padding:12px;">국면</th>
+      <th style="padding:12px;">위험도</th>
+      <th style="padding:12px;text-align:left;">🛒 신규 매수자</th>
+      <th style="padding:12px;text-align:left;">🏠 기존 보유자</th>
+    </tr></thead><tbody>`;
+  valid.forEach(r => {
+    const p = PHASES[r.phase];
+    html += `<tr style="border-bottom:1px solid #e2e8f0;cursor:pointer;" onclick="showPhaseDetail(${r.phase}, '${r.region.name}')">
+      <td style="padding:12px;font-weight:700;color:#1a365d;">${r.region.name}<br><span style="font-size:11px;color:#a0aec0;font-weight:400;">${r.region.code}</span></td>
+      <td style="padding:12px;text-align:center;color:${r.volChange>=0?'#38a169':'#e53e3e'};font-weight:700;">${r.volChange>=0?'+':''}${r.volChange}%</td>
+      <td style="padding:12px;text-align:center;color:${r.priceChange>=0?'#38a169':'#e53e3e'};font-weight:700;">${r.priceChange>=0?'+':''}${r.priceChange}%</td>
+      <td style="padding:12px;text-align:center;">
+        <div style="font-size:22px;font-weight:800;color:${p.color};">${r.phase}번</div>
+        <div style="font-size:11px;color:#718096;">${p.name}</div>
+      </td>
+      <td style="padding:12px;text-align:center;">
+        <div style="font-size:18px;">${p.signal}</div>
+        <div style="color:${p.color};font-weight:700;">${'★'.repeat(p.risk)}${'☆'.repeat(5-p.risk)}</div>
+      </td>
+      <td style="padding:12px;font-size:12px;">${p.buyer}</td>
+      <td style="padding:12px;font-size:12px;">${p.holder}</td>
+    </tr>`;
+  });
+  html += `</tbody></table></div>`;
+  if (errors.length) {
+    html += `<div class="warning-box" style="margin-top:16px;">⚠️ 일부 지역 조회 실패: ${errors.map(e => `${e.region.name}(${e.error})`).join(', ')}</div>`;
+  }
+  html += `<h3 style="color:#1a365d;margin-top:24px;margin-bottom:12px;">🎯 벌집순환모형 위 현재 위치</h3>
+    <div class="chart-container"><div class="chart-wrapper"><canvas id="cycleChart"></canvas></div></div>
+    <div style="font-size:12px;color:#718096;margin-top:8px;text-align:center;">X축: 거래량 변화율(%) · Y축: 가격 변화율(%) · 표의 행을 클릭하면 국면 상세 정보 표시</div>
+    <div id="phaseDetailBox" style="margin-top:20px;"></div>`;
+  html += `</div>`;
+  document.getElementById('cycleResult').innerHTML = html;
+  renderCycleChart(valid);
+}
+
+function renderCycleChart(results) {
+  const ctx = document.getElementById('cycleChart').getContext('2d');
+  if (cycleChart) cycleChart.destroy();
+  const data = results.map(r => ({
+    x: r.volChange, y: r.priceChange,
+    label: r.region.name, phase: r.phase, color: PHASES[r.phase].color
+  }));
+  cycleChart = new Chart(ctx, {
+    type: 'scatter',
+    data: { datasets: [{
+      label: '지역별 현재 위치', data,
+      backgroundColor: data.map(d => d.color), borderColor: data.map(d => d.color),
+      pointRadius: 10, pointHoverRadius: 14
+    }]},
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: c => {
+          const d = c.raw;
+          return `${d.label}: ${d.phase}번 국면 (거래량 ${d.x>=0?'+':''}${d.x}%, 가격 ${d.y>=0?'+':''}${d.y}%)`;
+        }}}
+      },
+      scales: {
+        x: { title: { display: true, text: '거래량 변화율 (%)' }},
+        y: { title: { display: true, text: '가격 변화율 (%)' }}
+      }
+    }
+  });
+}
+
+function showPhaseDetail(phase, regionName) {
+  const p = PHASES[phase];
+  document.getElementById('phaseDetailBox').innerHTML = `
+    <div class="result-box">
+      <h3>📌 ${regionName} — ${phase}번 국면 상세</h3>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px;margin-top:12px;">
+        <div style="background:white;padding:16px;border-radius:8px;border-left:4px solid ${p.color};">
+          <div style="font-size:11px;color:#718096;">국면 이름</div>
+          <div style="font-size:16px;font-weight:800;color:${p.color};margin-top:4px;">${p.name}</div>
+          <div style="font-size:12px;color:#4a5568;margin-top:6px;font-style:italic;">"${p.desc}"</div>
+        </div>
+        <div style="background:white;padding:16px;border-radius:8px;border-left:4px solid #4a5568;">
+          <div style="font-size:11px;color:#718096;">📊 시장 상태</div>
+          <div style="font-size:13px;margin-top:6px;line-height:1.5;">${p.market}</div>
+        </div>
+        <div style="background:white;padding:16px;border-radius:8px;border-left:4px solid #805ad5;">
+          <div style="font-size:11px;color:#718096;">🧠 대중 심리</div>
+          <div style="font-size:13px;margin-top:6px;line-height:1.5;">${p.psych}</div>
+        </div>
+        <div style="background:white;padding:16px;border-radius:8px;border-left:4px solid ${p.color};">
+          <div style="font-size:11px;color:#718096;">⚠️ 위험도</div>
+          <div style="font-size:24px;margin-top:4px;">${p.signal} ${'★'.repeat(p.risk)}${'☆'.repeat(5-p.risk)}</div>
+        </div>
+      </div>
+      <div style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="insight-box"><strong>🛒 신규 매수자:</strong><br>${p.buyer}</div>
+        <div class="insight-box"><strong>🏠 기존 보유자:</strong><br>${p.holder}</div>
+      </div>
+    </div>
+  `;
+  document.getElementById('phaseDetailBox').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+// 시작 시 초기화
+window.addEventListener('load', () => {
+  const savedKey = localStorage.getItem('apiKey');
+  if (savedKey) {
+    const apiInput = document.getElementById('apiKey');
+    if (apiInput) apiInput.value = savedKey;
+  }
+  renderRegionList();
+  pcPopulateRegions();
+  document.getElementById('cycleResult').innerHTML = `
+    <div class="insight-box">
+      <strong>👋 시작하기:</strong><br>
+      1️⃣ "API 설정" 탭에서 공공데이터 API 키 등록<br>
+      2️⃣ 이 탭에서 관심 지역 추가 (또는 "데모 지역 불러오기" 클릭)<br>
+      3️⃣ "전체 지역 진단 시작" 버튼 클릭<br>
+      → 각 지역이 9개 국면 중 어디에 있는지, 신규 매수자/보유자 관점에서 어떻게 행동해야 하는지 진단해드립니다.
+    </div>`;
+});
+</script>
+
+<!-- PWA: Service Worker 등록 -->
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js')
+      .then(reg => console.log('[PWA] Service Worker 등록 성공:', reg.scope))
+      .catch(err => console.warn('[PWA] Service Worker 등록 실패:', err));
+  });
+}
+</script>
+</body>
+</html>
