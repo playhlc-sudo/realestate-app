@@ -782,7 +782,7 @@
       <label>거래월 (YYYYMM)</label>
       <input type="text" id="dealYmd" placeholder="202504" value="202504">
       <div style="margin-top:16px;">
-        <button class="btn-primary" onclick="testAPI()">🔍 API 연결 테스트</button>
+        <button class="btn-primary" onclick="testAPI()">🔗 API 연결 확인</button>
         <button class="btn-primary" onclick="showKeyTransferQR()" style="background:#2c5282;margin-left:8px;">📱 휴대폰으로 가져가기 (QR)</button>
       </div>
       <div id="apiResult" style="margin-top:16px;"></div>
@@ -885,7 +885,7 @@
       <p style="margin-top:8px;color:#4a5568;font-size:14px;">
         상단 탭 메뉴에서 <strong>🔗 API 설정</strong> 클릭<br>
         → 입력창에 복사한 Encoding 키 붙여넣기<br>
-        → <strong>🔍 API 연결 테스트</strong> 클릭하여 "✅ 정상 연결" 확인<br>
+        → <strong>🔗 API 연결 확인</strong> 클릭하여 "✅ API 연결 성공" 확인<br>
         → 키는 자동 저장되어 다음에 열 때 다시 입력할 필요 없음
       </p>
       <div style="margin-top:12px;">
@@ -964,7 +964,7 @@
       <p style="margin-top:8px;color:#4a5568;font-size:14px;">
         ① API 키가 정확히 입력됐는지 (앞뒤 공백 없이)<br>
         ② 발급 후 1~2시간 지났는지 (즉시 활성화 안 될 수 있음)<br>
-        ③ "🔗 API 설정" 탭의 "API 연결 테스트" 버튼으로 먼저 확인
+        ③ "🔗 API 설정" 탭의 "API 연결 확인" 버튼으로 먼저 확인
       </p>
     </div>
 
@@ -2165,27 +2165,135 @@ function hideKeyTransferQR() {
   }
 })();
 
-// ============ API 테스트 ============
-function testAPI() {
+// ============ API 연결 확인 (실제 호출) ============
+async function testAPI() {
   const key = document.getElementById('apiKey').value.trim();
-  const lawd = document.getElementById('lawdCd').value.trim();
-  const ymd = document.getElementById('dealYmd').value.trim();
+  const lawd = (document.getElementById('lawdCd').value || '11680').trim();
+  const ymd = (document.getElementById('dealYmd').value || '202504').trim();
   const resultDiv = document.getElementById('apiResult');
+
+  // 0) 입력 검증
   if (!key) {
-    resultDiv.innerHTML = `<div class="warning-box"><strong>⚠️</strong> API 키를 입력해주세요.</div>`;
+    resultDiv.innerHTML = `<div class="warning-box"><strong>⚠️ API 키를 입력해주세요.</strong><br>위 4번 칸에 공공데이터포털에서 발급받은 인증키를 붙여넣어 주세요.</div>`;
     return;
   }
-  const url = `https://apis.data.go.kr/1613000/RTMSDataSvcAptTrade/getRTMSDataSvcAptTrade?serviceKey=${encodeURIComponent(key)}&LAWD_CD=${lawd}&DEAL_YMD=${ymd}`;
+  if (!/^\d{5}$/.test(lawd)) {
+    resultDiv.innerHTML = `<div class="warning-box"><strong>⚠️ 지역코드 형식 오류</strong><br>5자리 숫자여야 합니다. 예: 11680 (강남구)</div>`;
+    return;
+  }
+  if (!/^\d{6}$/.test(ymd)) {
+    resultDiv.innerHTML = `<div class="warning-box"><strong>⚠️ 거래월 형식 오류</strong><br>YYYYMM 형식의 6자리 숫자여야 합니다. 예: 202504</div>`;
+    return;
+  }
+
+  // 1) 호출 준비 (로딩 표시)
+  resultDiv.innerHTML = `<div class="insight-box">⏳ API 서버에 연결 중...</div>`;
+  // 이번 입력 키는 즉시 localStorage 저장 (사용자 편의)
+  localStorage.setItem('apiKey', key);
+
+  const url = `${API_BASE}?serviceKey=${encodeURIComponent(key)}&LAWD_CD=${lawd}&DEAL_YMD=${ymd}&numOfRows=10&pageNo=1`;
+
+  // 2) 호출
+  let res, text;
+  try {
+    res = await fetch(url);
+    text = await res.text();
+  } catch (e) {
+    resultDiv.innerHTML = `
+      <div class="warning-box">
+        <strong>❌ 네트워크 오류</strong><br><br>
+        API 서버에 연결하지 못했습니다.<br>
+        <strong>다음을 확인해주세요:</strong><br>
+        ① 인터넷 연결 상태<br>
+        ② 회사/학교 네트워크라면 외부 API 차단 여부<br>
+        ③ 잠시 후 다시 시도<br><br>
+        <span style="font-size:12px;color:#718096;">상세: ${(e.message || e).toString().substring(0,120)}</span>
+      </div>`;
+    return;
+  }
+
+  // 3) 응답 파싱 — 공공데이터포털은 보통 XML, 인증 실패 시 SOAP Fault가 올 수도 있음
+  const lower = text.toLowerCase();
+
+  // 3-a) SOAP/HTML 형태의 인증 실패 (가장 흔한 케이스)
+  if (lower.includes('service_key_is_not_registered') || lower.includes('servicekey_is_not_registered')) {
+    resultDiv.innerHTML = `
+      <div class="warning-box">
+        <strong>❌ API 키가 등록되지 않았습니다</strong><br><br>
+        <strong>가장 흔한 원인:</strong><br>
+        ① 키를 <u>복사할 때 공백이 같이 들어갔을 수</u> 있어요 → 다시 붙여넣기 시도<br>
+        ② 키는 맞는데 <u>"국토교통부_아파트 매매 실거래가 <b>상세</b> 자료"</u>를 신청하지 않았을 수 있어요<br>
+        　　→ 위 2번 안내대로 <strong>'상세' 버전</strong>으로 활용신청 (구버전 X, 분양권매 X)<br>
+        ③ 활용신청 후 <strong>승인까지 1~2일</strong> 걸립니다. 신청 직후라면 조금 기다려주세요.
+      </div>`;
+    return;
+  }
+
+  // 3-b) XML 파싱
+  let resultCode = null, resultMsg = '', totalCount = null;
+  try {
+    const xml = new DOMParser().parseFromString(text, 'text/xml');
+    resultCode = xml.querySelector('resultCode')?.textContent?.trim();
+    resultMsg  = xml.querySelector('resultMsg')?.textContent?.trim() || '';
+    const tc   = xml.querySelector('totalCount')?.textContent?.trim();
+    totalCount = tc !== undefined && tc !== '' ? parseInt(tc, 10) : null;
+  } catch (e) {
+    // 파싱 실패 — raw 일부만 표시
+  }
+
+  // 3-c) 성공 (resultCode 00)
+  if (resultCode === '00' || resultCode === '0') {
+    const countLine = totalCount === null
+      ? ''
+      : (totalCount > 0
+          ? `이번 조회(${lawd}, ${ymd})에서 <strong>${totalCount.toLocaleString()}건</strong>의 거래가 확인되었습니다.`
+          : `이번 조회(${lawd}, ${ymd})는 데이터가 0건이지만, <u>키 인증 자체는 정상</u>입니다. (해당 월에 해당 지역 거래가 없었거나, 아직 집계 전일 수 있어요.)`);
+    resultDiv.innerHTML = `
+      <div class="insight-box" style="border-left:4px solid #38a169;">
+        <strong>✅ API 연결 성공!</strong><br><br>
+        키가 정상적으로 인증되었습니다. ${countLine}<br><br>
+        이제 <strong>"사이클 진단"</strong> 탭에서 관심 지역을 추가해 분석을 시작하실 수 있어요.
+      </div>`;
+    return;
+  }
+
+  // 3-d) 알려진 에러 코드별 친절한 안내
+  const codeMap = {
+    '01': { title:'활용신청 미승인 또는 어플리케이션 오류', tip:'공공데이터포털 마이페이지 → 오픈API → 활용신청 현황에서 <strong>승인 상태</strong>를 확인해주세요. 신청 후 1~2일이 걸릴 수 있습니다.' },
+    '02': { title:'DB 오류 (서버 측 일시 장애)', tip:'몇 분 후 다시 시도해주세요.' },
+    '03': { title:'데이터 없음', tip:'키는 유효합니다. 지역코드/거래월을 바꿔서 다시 시도해보세요.' },
+    '04': { title:'HTTP 요청 형식 오류', tip:'지역코드(5자리)와 거래월(YYYYMM 6자리)을 다시 확인해주세요.' },
+    '05': { title:'서비스 연결 실패', tip:'잠시 후 다시 시도해주세요.' },
+    '10': { title:'잘못된 요청 파라미터', tip:'지역코드 또는 거래월 값이 올바르지 않습니다.' },
+    '20': { title:'서비스 접근 거부', tip:'활용신청한 API와 호출 중인 API가 일치하는지 확인해주세요. <strong>"상세" 버전</strong>으로 신청하셨어야 합니다.' },
+    '22': { title:'일일 호출 한도 초과', tip:'무료 트래픽(보통 10,000건/일)을 모두 사용했어요. <u>내일 0시 이후</u> 다시 시도하거나, 공공데이터포털에서 트래픽 증가 신청을 해주세요.' },
+    '30': { title:'등록되지 않은 서비스 키', tip:'키 문자열을 다시 한 번 정확히 복사해서 붙여넣어 주세요. 앞뒤 공백/줄바꿈이 들어가면 실패합니다.' },
+    '31': { title:'활용 기간 만료', tip:'공공데이터포털에서 해당 API의 활용 연장을 신청해주세요.' },
+    '32': { title:'등록되지 않은 IP', tip:'활용신청 시 IP를 등록했다면, 사용 중인 네트워크의 IP를 다시 등록해주세요.' },
+    '33': { title:'서명되지 않은 호출', tip:'드문 경우입니다. 잠시 후 다시 시도해주세요.' },
+    '99': { title:'기타 오류', tip:'잠시 후 다시 시도하거나, 공공데이터포털 고객센터에 문의해주세요.' }
+  };
+
+  if (resultCode && codeMap[resultCode]) {
+    const info = codeMap[resultCode];
+    resultDiv.innerHTML = `
+      <div class="warning-box">
+        <strong>❌ ${info.title}</strong><br>
+        <span style="font-size:13px;color:#718096;">응답 코드 ${resultCode}${resultMsg ? ' — '+resultMsg : ''}</span><br><br>
+        <strong>해결 방법:</strong> ${info.tip}
+      </div>`;
+    return;
+  }
+
+  // 3-e) 그 외 — raw 응답 일부 노출 (가족용이지만 디버그용으로 최소한)
   resultDiv.innerHTML = `
-    <div class="insight-box">
-      <strong>✅ API 키가 저장되었습니다!</strong><br><br>
-      이제 "사이클 진단" 탭으로 가서 관심 지역을 추가하고 진단을 시작하실 수 있습니다.<br><br>
-      <strong>호출 URL 예시:</strong><br>
-      <code style="font-size:11px;word-break:break-all;background:#f7fafc;padding:6px;display:block;margin-top:6px;border-radius:4px;">
-        ${url.substring(0, 150)}...
+    <div class="warning-box">
+      <strong>❌ 알 수 없는 응답</strong><br><br>
+      서버가 예상치 못한 형식으로 답했어요. 잠시 후 다시 시도해보시고, 계속 실패하면 아래 응답을 참고해주세요.<br><br>
+      <code style="font-size:11px;word-break:break-all;background:#f7fafc;padding:6px;display:block;border-radius:4px;">
+        ${(text || '').substring(0, 300).replace(/</g, '&lt;')}
       </code>
-    </div>
-  `;
+    </div>`;
 }
 
 // ============================================================

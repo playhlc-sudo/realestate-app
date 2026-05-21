@@ -1,7 +1,7 @@
 // Service Worker for 부동산 원리 이해 앱
 // 최소 구성: 앱 셸 캐싱 (오프라인에서도 첫 로딩 가능)
 
-const CACHE_NAME = 'realestate-app-v1';
+const CACHE_NAME = 'realestate-app-v2';
 const ASSETS = [
   './',
   './index.html',
