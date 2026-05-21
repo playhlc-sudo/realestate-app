@@ -774,13 +774,12 @@
 
     <div class="api-step">
       <span class="step-num">4</span>
-      <strong>아래에 API 키를 입력하여 연동 테스트</strong>
+      <strong>아래에 API 키를 입력하여 연결 확인</strong>
       <label style="margin-top:12px;">서비스 키 (Service Key) — 한 번 입력하면 브라우저에 저장됩니다</label>
       <input type="text" id="apiKey" placeholder="발급받은 인증키를 입력하세요" oninput="localStorage.setItem('apiKey', this.value)">
-      <label>지역코드 (예: 11680 = 강남구)</label>
-      <input type="text" id="lawdCd" placeholder="11680" value="11680">
-      <label>거래월 (YYYYMM)</label>
-      <input type="text" id="dealYmd" placeholder="202504" value="202504">
+      <div style="margin-top:8px;font-size:13px;color:#718096;line-height:1.5;">
+        💡 <strong>지역과 날짜는 입력하지 않아도 됩니다.</strong> "API 연결 확인" 버튼을 누르면 샘플 지역(강남구)으로 자동 시험합니다. 실제 분석은 "사이클 진단" 탭에서 진행하세요.
+      </div>
       <div style="margin-top:16px;">
         <button class="btn-primary" onclick="testAPI()">🔗 API 연결 확인</button>
         <button class="btn-primary" onclick="showKeyTransferQR()" style="background:#2c5282;margin-left:8px;">📱 휴대폰으로 가져가기 (QR)</button>
@@ -2166,37 +2165,38 @@ function hideKeyTransferQR() {
 })();
 
 // ============ API 연결 확인 (실제 호출) ============
+// 직전 달 YYYYMM 계산 (현재 달은 아직 데이터가 없을 수 있음)
+function _prevMonthYYYYMM() {
+  const d = new Date();
+  d.setMonth(d.getMonth() - 1);
+  return d.getFullYear().toString() + String(d.getMonth() + 1).padStart(2, '0');
+}
+
 async function testAPI() {
-  const key = document.getElementById('apiKey').value.trim();
-  const lawd = (document.getElementById('lawdCd').value || '11680').trim();
-  const ymd = (document.getElementById('dealYmd').value || '202504').trim();
+  const key = (document.getElementById('apiKey').value || '').trim();
   const resultDiv = document.getElementById('apiResult');
 
-  // 0) 입력 검증
+  // 0) 입력 검증 — 키만 필수
   if (!key) {
-    resultDiv.innerHTML = `<div class="warning-box"><strong>⚠️ API 키를 입력해주세요.</strong><br>위 4번 칸에 공공데이터포털에서 발급받은 인증키를 붙여넣어 주세요.</div>`;
-    return;
-  }
-  if (!/^\d{5}$/.test(lawd)) {
-    resultDiv.innerHTML = `<div class="warning-box"><strong>⚠️ 지역코드 형식 오류</strong><br>5자리 숫자여야 합니다. 예: 11680 (강남구)</div>`;
-    return;
-  }
-  if (!/^\d{6}$/.test(ymd)) {
-    resultDiv.innerHTML = `<div class="warning-box"><strong>⚠️ 거래월 형식 오류</strong><br>YYYYMM 형식의 6자리 숫자여야 합니다. 예: 202504</div>`;
+    resultDiv.innerHTML = `<div class="warning-box"><strong>⚠️ API 키를 입력해주세요.</strong><br>위 칸에 공공데이터포털에서 발급받은 인증키를 붙여넣어 주세요.</div>`;
     return;
   }
 
-  // 1) 호출 준비 (로딩 표시)
-  resultDiv.innerHTML = `<div class="insight-box">⏳ API 서버에 연결 중...</div>`;
-  // 이번 입력 키는 즉시 localStorage 저장 (사용자 편의)
+  // 샘플 호출용 고정값 (강남구 + 직전 달)
+  const lawd = '11680';
+  const ymd = _prevMonthYYYYMM();
+
+  // 1) 로딩 표시 & 키 저장
+  resultDiv.innerHTML = `<div class="insight-box">⏳ API 서버에 연결 중... (강남구 ${ymd} 샘플 호출)</div>`;
   localStorage.setItem('apiKey', key);
 
-  const url = `${API_BASE}?serviceKey=${encodeURIComponent(key)}&LAWD_CD=${lawd}&DEAL_YMD=${ymd}&numOfRows=10&pageNo=1`;
+  // 2) CORS 프록시 경유 호출 (다른 함수들과 동일한 방식)
+  const apiUrl = `${API_BASE}?serviceKey=${encodeURIComponent(key)}&LAWD_CD=${lawd}&DEAL_YMD=${ymd}&numOfRows=10&pageNo=1`;
+  const proxiedUrl = CORS_PROXY + encodeURIComponent(apiUrl);
 
-  // 2) 호출
-  let res, text;
+  let text;
   try {
-    res = await fetch(url);
+    const res = await fetch(proxiedUrl);
     text = await res.text();
   } catch (e) {
     resultDiv.innerHTML = `
@@ -2212,24 +2212,42 @@ async function testAPI() {
     return;
   }
 
-  // 3) 응답 파싱 — 공공데이터포털은 보통 XML, 인증 실패 시 SOAP Fault가 올 수도 있음
-  const lower = text.toLowerCase();
+  const trimmed = (text || '').trim();
+  const lower = trimmed.toLowerCase();
 
-  // 3-a) SOAP/HTML 형태의 인증 실패 (가장 흔한 케이스)
-  if (lower.includes('service_key_is_not_registered') || lower.includes('servicekey_is_not_registered')) {
+  // 3-a) 인증 미동기화 — 가장 흔한 케이스 (사용자님 본인이 겪은 케이스)
+  //     공공데이터 게이트웨이가 "Unauthorized" / "Forbidden" 한 단어로 답함
+  if (
+    lower === 'unauthorized' ||
+    lower === 'forbidden' ||
+    lower.includes('service_key_is_not_registered') ||
+    lower.includes('servicekey_is_not_registered')
+  ) {
     resultDiv.innerHTML = `
       <div class="warning-box">
-        <strong>❌ API 키가 등록되지 않았습니다</strong><br><br>
-        <strong>가장 흔한 원인:</strong><br>
-        ① 키를 <u>복사할 때 공백이 같이 들어갔을 수</u> 있어요 → 다시 붙여넣기 시도<br>
-        ② 키는 맞는데 <u>"국토교통부_아파트 매매 실거래가 <b>상세</b> 자료"</u>를 신청하지 않았을 수 있어요<br>
-        　　→ 위 2번 안내대로 <strong>'상세' 버전</strong>으로 활용신청 (구버전 X, 분양권매 X)<br>
-        ③ 활용신청 후 <strong>승인까지 1~2일</strong> 걸립니다. 신청 직후라면 조금 기다려주세요.
+        <strong>⏳ API 키가 아직 활성화되지 않았습니다</strong><br><br>
+        공공데이터포털에서 <strong>승인은 났지만</strong>, API 서버에 키가 동기화되는 데 시간이 더 필요해요.<br><br>
+        <strong>확인 사항:</strong><br>
+        ① 신청한 API가 <strong>"국토교통부_아파트 매매 실거래가 <u>상세</u> 자료"</strong>가 맞는지<br>
+        ② 활용신청 시점이 <strong>최소 1~24시간 이상</strong> 지났는지 (보통 어제 신청했다면 오늘 안에 풀림)<br>
+        ③ 키 문자열에 <strong>앞뒤 공백/줄바꿈</strong>이 섞이지 않았는지<br><br>
+        <span style="color:#718096;font-size:13px;">💡 위 3가지가 모두 OK라면 그냥 <strong>몇 시간 더 기다린 후</strong> 다시 시도해주세요. 키를 재발급받으면 처음부터 다시 24시간 대기가 시작되니 권장하지 않습니다.</span>
       </div>`;
     return;
   }
 
-  // 3-b) XML 파싱
+  // 3-b) 빈 응답 / 짧은 비-XML 응답 — 프록시 일시 장애 가능성
+  if (!trimmed || (trimmed.length < 30 && !trimmed.startsWith('<'))) {
+    resultDiv.innerHTML = `
+      <div class="warning-box">
+        <strong>⚠️ 응답이 비어있거나 형식이 예상과 달라요</strong><br><br>
+        중간 프록시 서버(corsproxy.io)의 일시 장애일 가능성이 있어요. <strong>1~2분 후 다시 시도</strong>해주세요.<br><br>
+        <span style="font-size:12px;color:#718096;">받은 응답: "${trimmed.substring(0,80).replace(/</g,'&lt;') || '(빈 응답)'}"</span>
+      </div>`;
+    return;
+  }
+
+  // 3-c) XML 파싱
   let resultCode = null, resultMsg = '', totalCount = null;
   try {
     const xml = new DOMParser().parseFromString(text, 'text/xml');
@@ -2238,16 +2256,16 @@ async function testAPI() {
     const tc   = xml.querySelector('totalCount')?.textContent?.trim();
     totalCount = tc !== undefined && tc !== '' ? parseInt(tc, 10) : null;
   } catch (e) {
-    // 파싱 실패 — raw 일부만 표시
+    // 파싱 실패 — 아래 3-e에서 raw 일부 노출
   }
 
-  // 3-c) 성공 (resultCode 00)
+  // 3-d) 성공 (resultCode 00)
   if (resultCode === '00' || resultCode === '0') {
     const countLine = totalCount === null
       ? ''
       : (totalCount > 0
-          ? `이번 조회(${lawd}, ${ymd})에서 <strong>${totalCount.toLocaleString()}건</strong>의 거래가 확인되었습니다.`
-          : `이번 조회(${lawd}, ${ymd})는 데이터가 0건이지만, <u>키 인증 자체는 정상</u>입니다. (해당 월에 해당 지역 거래가 없었거나, 아직 집계 전일 수 있어요.)`);
+          ? `샘플 조회(강남구, ${ymd})에서 <strong>${totalCount.toLocaleString()}건</strong>의 거래가 확인되었습니다.`
+          : `샘플 조회(강남구, ${ymd})는 데이터가 0건이지만, <u>키 인증 자체는 정상</u>입니다.`);
     resultDiv.innerHTML = `
       <div class="insight-box" style="border-left:4px solid #38a169;">
         <strong>✅ API 연결 성공!</strong><br><br>
@@ -2257,15 +2275,15 @@ async function testAPI() {
     return;
   }
 
-  // 3-d) 알려진 에러 코드별 친절한 안내
+  // 3-e) 알려진 에러 코드별 친절한 안내
   const codeMap = {
     '01': { title:'활용신청 미승인 또는 어플리케이션 오류', tip:'공공데이터포털 마이페이지 → 오픈API → 활용신청 현황에서 <strong>승인 상태</strong>를 확인해주세요. 신청 후 1~2일이 걸릴 수 있습니다.' },
     '02': { title:'DB 오류 (서버 측 일시 장애)', tip:'몇 분 후 다시 시도해주세요.' },
-    '03': { title:'데이터 없음', tip:'키는 유효합니다. 지역코드/거래월을 바꿔서 다시 시도해보세요.' },
-    '04': { title:'HTTP 요청 형식 오류', tip:'지역코드(5자리)와 거래월(YYYYMM 6자리)을 다시 확인해주세요.' },
+    '03': { title:'데이터 없음', tip:'키는 유효합니다. 사이클 진단 탭에서 다른 지역으로 시도해보세요.' },
+    '04': { title:'HTTP 요청 형식 오류', tip:'드문 경우입니다. 잠시 후 다시 시도해주세요.' },
     '05': { title:'서비스 연결 실패', tip:'잠시 후 다시 시도해주세요.' },
-    '10': { title:'잘못된 요청 파라미터', tip:'지역코드 또는 거래월 값이 올바르지 않습니다.' },
-    '20': { title:'서비스 접근 거부', tip:'활용신청한 API와 호출 중인 API가 일치하는지 확인해주세요. <strong>"상세" 버전</strong>으로 신청하셨어야 합니다.' },
+    '10': { title:'잘못된 요청 파라미터', tip:'잠시 후 다시 시도해주세요.' },
+    '20': { title:'서비스 접근 거부', tip:'활용신청한 API가 <strong>"국토교통부_아파트 매매 실거래가 상세 자료"</strong>가 맞는지 확인해주세요. (구버전 X, 분양권매 X)' },
     '22': { title:'일일 호출 한도 초과', tip:'무료 트래픽(보통 10,000건/일)을 모두 사용했어요. <u>내일 0시 이후</u> 다시 시도하거나, 공공데이터포털에서 트래픽 증가 신청을 해주세요.' },
     '30': { title:'등록되지 않은 서비스 키', tip:'키 문자열을 다시 한 번 정확히 복사해서 붙여넣어 주세요. 앞뒤 공백/줄바꿈이 들어가면 실패합니다.' },
     '31': { title:'활용 기간 만료', tip:'공공데이터포털에서 해당 API의 활용 연장을 신청해주세요.' },
@@ -2285,7 +2303,7 @@ async function testAPI() {
     return;
   }
 
-  // 3-e) 그 외 — raw 응답 일부 노출 (가족용이지만 디버그용으로 최소한)
+  // 3-f) 그 외 — raw 응답 일부 노출
   resultDiv.innerHTML = `
     <div class="warning-box">
       <strong>❌ 알 수 없는 응답</strong><br><br>

@@ -1,7 +1,8 @@
 // Service Worker for 부동산 원리 이해 앱
 // 최소 구성: 앱 셸 캐싱 (오프라인에서도 첫 로딩 가능)
 
-const CACHE_NAME = 'realestate-app-v2';
+// 🚨 index.html을 수정할 때마다 이 숫자를 함께 올려야 가족분들 앱이 자동 업데이트됩니다.
+const CACHE_NAME = 'realestate-app-v3';
 const ASSETS = [
   './',
   './index.html',
