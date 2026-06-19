@@ -2259,8 +2259,8 @@ async function testAPI() {
     // 파싱 실패 — 아래 3-e에서 raw 일부 노출
   }
 
-  // 3-d) 성공 (resultCode 00)
-  if (resultCode === '00' || resultCode === '0') {
+  // 3-d) 성공 (resultCode 00, 000, 0 등)
+  if (resultCode === '00' || resultCode === '0' || resultCode === '000') {
     const countLine = totalCount === null
       ? ''
       : (totalCount > 0
